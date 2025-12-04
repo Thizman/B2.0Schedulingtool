@@ -12,11 +12,11 @@ class SchedulingTool:
         self.root.title("B2.0 Scheduling Tool")
         self.root.geometry("1600x900")
 
-        # Claude-inspired color scheme
+        # Claude-inspired color scheme (adjusted hierarchy)
         self.colors = {
-            'bg_dark': '#1a1a1a',
-            'bg_medium': '#2a2a2a',
-            'bg_light': '#3a3a3a',
+            'bg_dark': '#2a2a2a',      # Main background (day blocks)
+            'bg_medium': '#3a3a3a',    # Lighter background
+            'bg_light': '#4a4a4a',     # Lightest background
             'accent': '#d4734b',
             'accent_hover': '#e38a61',
             'text_primary': '#e8e8e8',
@@ -25,8 +25,11 @@ class SchedulingTool:
             'success': '#5eb56e',
             'warning': '#d4734b',
             'error': '#d44747',
-            'border': '#4a4a4a'
+            'border': '#5a5a5a'        # Lightest grey for borders
         }
+
+        # Track if schedule has been generated
+        self.schedule_generated = False
 
         # Configure root window
         self.root.configure(bg=self.colors['bg_dark'])
@@ -53,6 +56,19 @@ class SchedulingTool:
 
         self.setup_styles()
         self.setup_ui()
+
+    def get_display_name(self, full_name):
+        """Get display name: first name only, or first name + last initial if duplicate"""
+        parts = full_name.split()
+        first_name = parts[0] if parts else full_name
+
+        # Check if there are other people with the same first name
+        same_first_name = [p for p in self.people if p['name'].split()[0] == first_name]
+
+        if len(same_first_name) > 1 and len(parts) > 1:
+            # Add last initial
+            return f"{first_name} {parts[-1][0]}."
+        return first_name
 
     def setup_styles(self):
         """Setup ttk styles with Claude-inspired theme"""
@@ -105,116 +121,103 @@ class SchedulingTool:
                  foreground=[('selected', self.colors['accent'])])
 
     def setup_ui(self):
-        # Main container
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-
-        # Configure grid weights
+        # Configure grid weights for root
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(2, weight=1)
+
+        # Create main scrollable canvas
+        main_canvas = tk.Canvas(self.root, bg=self.colors['bg_dark'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=main_canvas.yview)
+
+        # Scrollable frame inside canvas
+        self.scrollable_frame = ttk.Frame(main_canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        )
+
+        main_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        main_canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Enable mousewheel scrolling
+        def _on_mousewheel(event):
+            main_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        main_canvas.bind_all("<MouseWheel>", _on_mousewheel)  # Windows/MacOS
+        main_canvas.bind_all("<Button-4>", lambda e: main_canvas.yview_scroll(-1, "units"))  # Linux
+        main_canvas.bind_all("<Button-5>", lambda e: main_canvas.yview_scroll(1, "units"))  # Linux
+
+        main_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+
+        # Configure scrollable frame
+        self.scrollable_frame.columnconfigure(0, weight=1)
 
         # Top section - File and Configuration
-        self.setup_config_section(main_frame)
+        self.setup_config_section(self.scrollable_frame)
 
-        # Middle section - Week info
-        self.setup_week_section(main_frame)
-
-        # Bottom section - Schedule and Hours display
-        self.setup_display_section(main_frame)
+        # Bottom section - Schedule and Hours display (week info will be inside)
+        self.setup_display_section(self.scrollable_frame)
 
     def setup_config_section(self, parent):
         config_frame = ttk.LabelFrame(parent, text="Configuration", padding="10")
-        config_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        config_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10), padx=10)
 
         # CSV File selection
         ttk.Label(config_frame, text="CSV File:").grid(row=0, column=0, sticky=tk.W, padx=5)
-        self.file_label = ttk.Label(config_frame, text="No file selected", foreground="red")
+        self.file_label = ttk.Label(config_frame, text="No file selected", foreground=self.colors['error'])
         self.file_label.grid(row=0, column=1, sticky=tk.W, padx=5)
         ttk.Button(config_frame, text="Browse", command=self.load_csv).grid(row=0, column=2, padx=5)
 
+        # Week number
+        ttk.Label(config_frame, text="Week Number:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(config_frame, textvariable=self.week_number, width=10).grid(row=1, column=1, sticky=tk.W, padx=5)
+
         # Desks available
-        ttk.Label(config_frame, text="Desks Available:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        ttk.Entry(config_frame, textvariable=self.desks_available, width=10).grid(row=1, column=1, sticky=tk.W, padx=5)
+        ttk.Label(config_frame, text="Desks Available:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(config_frame, textvariable=self.desks_available, width=10).grid(row=2, column=1, sticky=tk.W, padx=5)
 
         # Min shift length
-        ttk.Label(config_frame, text="Min Shift Length (hours):").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
-        ttk.Entry(config_frame, textvariable=self.min_shift_length, width=10).grid(row=2, column=1, sticky=tk.W, padx=5)
+        ttk.Label(config_frame, text="Min Shift Length (hours):").grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
+        ttk.Entry(config_frame, textvariable=self.min_shift_length, width=10).grid(row=3, column=1, sticky=tk.W, padx=5)
 
         # Generate schedule button
         ttk.Button(config_frame, text="Generate Schedule", command=self.generate_schedule,
-                   style="Accent.TButton").grid(row=3, column=0, columnspan=3, pady=10)
+                   style="Accent.TButton").grid(row=4, column=0, columnspan=3, pady=10)
 
-    def setup_week_section(self, parent):
-        week_frame = ttk.LabelFrame(parent, text="Week Information", padding="10")
-        week_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
-
-        # Week number input
-        ttk.Label(week_frame, text="Week Number:").grid(row=0, column=0, sticky=tk.W, padx=5)
-        ttk.Entry(week_frame, textvariable=self.week_number, width=10).grid(row=0, column=1, sticky=tk.W, padx=5)
-        ttk.Button(week_frame, text="Update", command=self.update_week_display).grid(row=0, column=2, padx=5)
-
-        # Week display
-        self.week_display = ttk.Label(week_frame, text="", font=("Arial", 12, "bold"))
-        self.week_display.grid(row=1, column=0, columnspan=3, pady=10)
-
-        self.update_week_display()
 
     def setup_display_section(self, parent):
         # Create notebook for tabs
         notebook = ttk.Notebook(parent)
-        notebook.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10)
 
         # Schedule tab
-        schedule_frame = ttk.Frame(notebook)
-        notebook.add(schedule_frame, text="Weekly Schedule")
-        self.setup_schedule_display(schedule_frame)
+        self.schedule_frame = ttk.Frame(notebook)
+        notebook.add(self.schedule_frame, text="Weekly Schedule")
 
         # Hours tracker tab
-        hours_frame = ttk.Frame(notebook)
-        notebook.add(hours_frame, text="Hours Tracker")
-        self.setup_hours_display(hours_frame)
+        self.hours_frame = ttk.Frame(notebook)
+        notebook.add(self.hours_frame, text="Hours Tracker")
 
-    def setup_schedule_display(self, parent):
-        # Create scrollable frame
-        canvas = tk.Canvas(parent)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        # Show placeholder initially
+        self.show_placeholder(self.schedule_frame, "Load a CSV file and click 'Generate Schedule' to begin")
+        self.show_placeholder(self.hours_frame, "Hours tracking will appear here after schedule generation")
 
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+    def show_placeholder(self, parent, message):
+        """Show a placeholder message in empty frames"""
+        for widget in parent.winfo_children():
+            widget.destroy()
 
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        placeholder = tk.Label(parent, text=message,
+                              font=("Consolas", 12),
+                              fg=self.colors['text_muted'],
+                              bg=self.colors['bg_dark'],
+                              pady=50)
+        placeholder.pack(expand=True)
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        self.schedule_frame = scrollable_frame
-
-    def setup_hours_display(self, parent):
-        # Create scrollable frame
-        canvas = tk.Canvas(parent)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        self.hours_frame = scrollable_frame
-
-    def update_week_display(self):
+    def get_week_display_text(self):
+        """Get formatted week display text"""
         try:
             week_num = int(self.week_number.get())
             year = datetime.now().year
@@ -231,10 +234,9 @@ class SchedulingTool:
             week_start = first_monday + timedelta(weeks=week_num - 1)
             week_end = week_start + timedelta(days=3)  # Thursday
 
-            display_text = f"Week {week_num}\n{week_start.strftime('%B %d, %Y')} - {week_end.strftime('%B %d, %Y')}"
-            self.week_display.config(text=display_text)
+            return f"Week {week_num}  •  {week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
         except ValueError:
-            self.week_display.config(text="Invalid week number")
+            return "Invalid week number"
 
     def load_csv(self):
         file_path = filedialog.askopenfilename(
@@ -246,10 +248,10 @@ class SchedulingTool:
             try:
                 self.csv_file_path = file_path
                 self.parse_csv()
-                self.file_label.config(text=file_path.split('/')[-1], foreground="green")
+                self.file_label.config(text=file_path.split('/')[-1], foreground=self.colors['success'])
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load CSV: {str(e)}")
-                self.file_label.config(text="Error loading file", foreground="red")
+                self.file_label.config(text="Error loading file", foreground=self.colors['error'])
 
     def parse_csv(self):
         self.people = []
@@ -323,6 +325,9 @@ class SchedulingTool:
 
         # Convert temp_schedule to person-centric schedule
         self.convert_to_person_schedule(min_shift)
+
+        # Mark as generated
+        self.schedule_generated = True
 
         # Display results
         self.display_schedule()
@@ -539,121 +544,188 @@ class SchedulingTool:
         desks = int(self.desks_available.get())
         min_shift = int(self.min_shift_length.get())
 
-        # Create main grid
-        grid_frame = tk.Frame(self.schedule_frame, bg=self.colors['bg_dark'])
-        grid_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        # Main container
+        main_container = tk.Frame(self.schedule_frame, bg=self.colors['bg_dark'])
+        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-        # Time labels column
-        time_col = tk.Frame(grid_frame, bg=self.colors['bg_dark'], width=80)
-        time_col.grid(row=1, column=0, sticky=(tk.N, tk.S))
+        # Week information at top
+        week_info = tk.Label(main_container,
+                            text=self.get_week_display_text(),
+                            font=("Consolas", 14, "bold"),
+                            fg=self.colors['accent'],
+                            bg=self.colors['bg_dark'],
+                            pady=15)
+        week_info.pack(anchor=tk.W)
+
+        # 2x2 grid for days (more width per day)
+        days_grid = tk.Frame(main_container, bg=self.colors['bg_dark'])
+        days_grid.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+
+        # Configure grid to expand equally
+        for i in range(2):
+            days_grid.columnconfigure(i, weight=1)
+            days_grid.rowconfigure(i, weight=1)
+
+        # Create each day block in 2x2 grid
+        grid_positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
+
+        for day_idx, day in enumerate(self.day_names):
+            row, col = grid_positions[day_idx]
+            self.create_day_block(days_grid, day, day_idx, desks, min_shift, row, col)
+
+    def create_day_block(self, parent, day, day_idx, desks, min_shift, row, col):
+        """Create a single day schedule block"""
+        # Day container with rounded appearance
+        day_container = tk.Frame(parent, bg=self.colors['bg_dark'])
+        day_container.grid(row=row, column=col, sticky=(tk.W, tk.E, tk.N, tk.S),
+                          padx=10, pady=10)
+
+        # Day header
+        header = tk.Frame(day_container, bg=self.colors['bg_medium'],
+                         height=40)
+        header.pack(fill=tk.X, pady=(0, 5))
+
+        tk.Label(header, text=day,
+                font=("Consolas", 13, "bold"),
+                fg=self.colors['text_primary'],
+                bg=self.colors['bg_medium'],
+                pady=10).pack()
+
+        # Schedule grid frame (time + warnings + calendar)
+        schedule_grid = tk.Frame(day_container, bg=self.colors['bg_dark'])
+        schedule_grid.pack(fill=tk.BOTH, expand=True)
+
+        # Time column
+        time_col = tk.Frame(schedule_grid, bg=self.colors['bg_dark'], width=60)
+        time_col.grid(row=0, column=0, sticky=(tk.N, tk.S), padx=(0, 5))
+
+        # Warning column
+        warning_col = tk.Frame(schedule_grid, bg=self.colors['bg_dark'], width=50)
+        warning_col.grid(row=0, column=1, sticky=(tk.N, tk.S), padx=(0, 5))
+
+        # Calendar canvas
+        canvas_frame = tk.Frame(schedule_grid, bg=self.colors['bg_dark'])
+        canvas_frame.grid(row=0, column=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+        schedule_grid.columnconfigure(2, weight=1)
+
+        # Create canvas
+        day_canvas = tk.Canvas(canvas_frame,
+                              height=450,
+                              bg=self.colors['bg_dark'],
+                              highlightthickness=1,
+                              highlightbackground=self.colors['border'])
+        day_canvas.pack(fill=tk.BOTH, expand=True)
 
         # Add time labels
-        for i, time in enumerate(self.timeslots[:-1]):  # Exclude 16:30 from labels
-            time_label = tk.Label(time_col, text=time,
-                                font=("Consolas", 10),
-                                fg=self.colors['text_muted'],
-                                bg=self.colors['bg_dark'],
-                                anchor=tk.E,
-                                padx=10)
-            time_label.grid(row=i, column=0, sticky=tk.E, pady=(0, 40))
+        for i, time in enumerate(self.timeslots[:-1]):
+            tk.Label(time_col, text=time,
+                    font=("Consolas", 9),
+                    fg=self.colors['text_muted'],
+                    bg=self.colors['bg_dark'],
+                    anchor=tk.E).grid(row=i, column=0, sticky=tk.E, pady=(0, 44))
 
-        # Create columns for each day
-        for day_idx, day in enumerate(self.day_names):
-            # Day header
-            day_header = tk.Frame(grid_frame, bg=self.colors['bg_medium'],
-                                height=50, width=300)
-            day_header.grid(row=0, column=day_idx + 1, sticky=(tk.W, tk.E),
-                          padx=5, pady=(0, 10))
-            day_header.grid_propagate(False)
+        # Count capacity and add warnings
+        slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
 
-            day_label = tk.Label(day_header, text=day,
-                                font=("Consolas", 14, "bold"),
-                                fg=self.colors['text_primary'],
-                                bg=self.colors['bg_medium'])
-            day_label.pack(expand=True)
+        if day in self.schedule:
+            for person_name, shift in self.schedule[day].items():
+                for i in range(shift['start'], shift['end']):
+                    if i in slot_counts:
+                        slot_counts[i] += 1
 
-            # Create canvas for this day's schedule
-            day_canvas = tk.Canvas(grid_frame,
-                                  width=300,
-                                  height=500,
-                                  bg=self.colors['bg_medium'],
-                                  highlightthickness=1,
-                                  highlightbackground=self.colors['border'])
-            day_canvas.grid(row=1, column=day_idx + 1, sticky=(tk.N, tk.S),
-                          padx=5)
+        # Add warning labels
+        for i in range(len(self.timeslots) - 1):
+            if slot_counts[i] < desks:
+                warning_label = tk.Label(warning_col,
+                                        text=f"⚠ {slot_counts[i]}/{desks}",
+                                        font=("Consolas", 8),
+                                        fg=self.colors['error'],
+                                        bg=self.colors['bg_dark'])
+                warning_label.grid(row=i, column=0, pady=(0, 44))
+
+        # Update canvas when it's sized
+        def draw_schedule(event=None):
+            canvas_width = day_canvas.winfo_width()
+            if canvas_width <= 1:
+                canvas_width = 400  # Default width
+
+            day_canvas.delete("all")
 
             # Draw time grid lines
             for i in range(len(self.timeslots)):
                 y = i * 60
-                day_canvas.create_line(0, y, 300, y,
+                day_canvas.create_line(0, y, canvas_width, y,
                                       fill=self.colors['border'],
                                       width=1)
 
-            # Get people scheduled for this day
+            # Draw schedule blocks
             if day in self.schedule:
-                # Count people per timeslot for capacity tracking
-                slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
+                # Calculate block width
+                block_width = (canvas_width - 10) / desks
 
-                # Draw blocks for each person
-                x_offset = 5
-                block_width = (300 - 10) // desks  # Divide width by number of desks
+                # Track lanes
+                lane_assignments = {}
 
-                # Group by start time for positioning
                 people_shifts = list(self.schedule[day].items())
                 people_shifts.sort(key=lambda x: x[1]['start'])
-
-                # Track which "lane" each person should be in
-                lanes_used = {}  # {start_slot: lane_number}
 
                 for person_name, shift in people_shifts:
                     start_idx = shift['start']
                     end_idx = shift['end']
-                    hours = shift['hours']
                     is_short = shift.get('is_short', False)
 
-                    # Find which lane to put this person in
+                    # Find available lane
                     lane = 0
                     for i in range(start_idx, end_idx):
                         if i in slot_counts:
-                            lane = max(lane, slot_counts[i])
-                            slot_counts[i] += 1
+                            current_lane_count = len([p for p, s in lane_assignments.items()
+                                                     if s['start'] <= i < s['end']])
+                            lane = max(lane, current_lane_count)
+
+                    lane_assignments[person_name] = shift
 
                     # Calculate position
                     y1 = start_idx * 60 + 5
                     y2 = end_idx * 60 - 5
-                    x1 = x_offset + (lane * block_width)
+                    x1 = 5 + (lane * block_width)
                     x2 = x1 + block_width - 5
 
-                    # Get color for this person
+                    # Get color
                     color = self.person_colors.get(person_name, self.colors['accent'])
 
-                    # Draw block
-                    block = day_canvas.create_rectangle(x1, y1, x2, y2,
-                                                       fill=color,
-                                                       outline=self.colors['border'],
-                                                       width=2)
+                    # Draw rounded rectangle (simulate with multiple lines)
+                    radius = 8
+                    day_canvas.create_arc(x1, y1, x1+radius*2, y1+radius*2,
+                                         start=90, extent=90, fill=color, outline="")
+                    day_canvas.create_arc(x2-radius*2, y1, x2, y1+radius*2,
+                                         start=0, extent=90, fill=color, outline="")
+                    day_canvas.create_arc(x1, y2-radius*2, x1+radius*2, y2,
+                                         start=180, extent=90, fill=color, outline="")
+                    day_canvas.create_arc(x2-radius*2, y2-radius*2, x2, y2,
+                                         start=270, extent=90, fill=color, outline="")
+                    day_canvas.create_rectangle(x1+radius, y1, x2-radius, y2,
+                                                fill=color, outline="")
+                    day_canvas.create_rectangle(x1, y1+radius, x2, y2-radius,
+                                                fill=color, outline="")
 
-                    # Add name label
-                    name_text = person_name
+                    # Draw border
+                    day_canvas.create_rectangle(x1, y1, x2, y2,
+                                               outline=self.colors['border'],
+                                               width=2)
+
+                    # Add name
+                    display_name = self.get_display_name(person_name)
                     if is_short:
-                        name_text += " ⚠"
+                        display_name += " ⚠"
 
                     text_y = (y1 + y2) / 2
-                    name_label = day_canvas.create_text((x1 + x2) / 2, text_y,
-                                                       text=name_text,
-                                                       fill=self.colors['bg_dark'],
-                                                       font=("Consolas", 9, "bold"),
-                                                       width=block_width - 10)
+                    day_canvas.create_text((x1 + x2) / 2, text_y,
+                                          text=display_name,
+                                          fill=self.colors['bg_dark'],
+                                          font=("Consolas", 10, "bold"))
 
-                # Check for unfilled slots
-                for i in range(len(self.timeslots) - 1):
-                    if slot_counts[i] < desks:
-                        # Draw warning indicator
-                        y = i * 60 + 30
-                        day_canvas.create_text(150, y,
-                                             text=f"⚠ {slot_counts[i]}/{desks}",
-                                             fill=self.colors['error'],
-                                             font=("Consolas", 9))
+        day_canvas.bind('<Configure>', draw_schedule)
+        day_canvas.after(100, draw_schedule)
 
     def display_hours(self):
         # Clear previous display
