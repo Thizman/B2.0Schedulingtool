@@ -115,7 +115,8 @@ class SchedulingTool:
                        bordercolor=self.colors['border'])
         style.configure('TNotebook.Tab',
                        background=self.colors['bg_medium'],
-                       foreground=self.colors['text_secondary'])
+                       foreground=self.colors['text_secondary'],
+                       focuscolor='')  # Remove dotted focus outline
         style.map('TNotebook.Tab',
                  background=[('selected', self.colors['bg_light'])],
                  foreground=[('selected', self.colors['accent'])])
@@ -162,7 +163,7 @@ class SchedulingTool:
 
     def setup_config_section(self, parent):
         config_frame = ttk.LabelFrame(parent, text="Configuration", padding="10")
-        config_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10), padx=10)
+        config_frame.grid(row=0, column=0, sticky=tk.W, pady=(0, 10), padx=10)  # Remove tk.E to prevent stretching
 
         # CSV File selection
         ttk.Label(config_frame, text="CSV File:").grid(row=0, column=0, sticky=tk.W, padx=5)
@@ -188,9 +189,9 @@ class SchedulingTool:
 
 
     def setup_display_section(self, parent):
-        # Create notebook for tabs
+        # Create notebook for tabs with rounded borders
         notebook = ttk.Notebook(parent)
-        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10)
+        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=(10, 20))
 
         # Schedule tab
         self.schedule_frame = ttk.Frame(notebook)
@@ -474,8 +475,15 @@ class SchedulingTool:
                     # Calculate shift duration (0.5 for last slot, 1 for others)
                     shift_hours = sum(0.5 if idx == 6 else 1 for idx in shift_slots)
 
-                    # Score: prefer filling empty slots, then prefer shifts that match preferred hours
-                    score = avg_in_slots * 100 - shift_hours  # Lower count is better
+                    # Check if this shift would exceed max hours
+                    if self.hours_scheduled[person['name']] + shift_hours > person['max_hours']:
+                        continue
+
+                    # Score: prefer filling empty slots, prioritize matching preferred hours
+                    # Lower score is better
+                    current_hours = self.hours_scheduled[person['name']]
+                    hours_gap_from_preferred = abs(person['preferred_hours'] - (current_hours + shift_hours))
+                    score = avg_in_slots * 100 + hours_gap_from_preferred
 
                     if score < best_score:
                         best_score = score
@@ -608,21 +616,24 @@ class SchedulingTool:
         canvas_frame.grid(row=0, column=2, sticky=(tk.W, tk.E, tk.N, tk.S))
         schedule_grid.columnconfigure(2, weight=1)
 
-        # Create canvas
+        # Create canvas with reduced height
+        SLOT_HEIGHT = 45  # Reduced from ~64 to 45 pixels per slot
+        canvas_height = len(self.timeslots[:-1]) * SLOT_HEIGHT
+
         day_canvas = tk.Canvas(canvas_frame,
-                              height=450,
+                              height=canvas_height,
                               bg=self.colors['bg_dark'],
                               highlightthickness=1,
                               highlightbackground=self.colors['border'])
         day_canvas.pack(fill=tk.BOTH, expand=True)
 
-        # Add time labels
+        # Add time labels with matching spacing
         for i, time in enumerate(self.timeslots[:-1]):
             tk.Label(time_col, text=time,
                     font=("Consolas", 9),
                     fg=self.colors['text_muted'],
                     bg=self.colors['bg_dark'],
-                    anchor=tk.E).grid(row=i, column=0, sticky=tk.E, pady=(0, 44))
+                    anchor=tk.E).grid(row=i, column=0, sticky=tk.E, pady=(0, SLOT_HEIGHT-12))
 
         # Count capacity and add warnings
         slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
@@ -633,7 +644,7 @@ class SchedulingTool:
                     if i in slot_counts:
                         slot_counts[i] += 1
 
-        # Add warning labels
+        # Add warning labels with matching spacing
         for i in range(len(self.timeslots) - 1):
             if slot_counts[i] < desks:
                 warning_label = tk.Label(warning_col,
@@ -641,7 +652,7 @@ class SchedulingTool:
                                         font=("Consolas", 8),
                                         fg=self.colors['error'],
                                         bg=self.colors['bg_dark'])
-                warning_label.grid(row=i, column=0, pady=(0, 44))
+                warning_label.grid(row=i, column=0, pady=(0, SLOT_HEIGHT-12))
 
         # Update canvas when it's sized
         def draw_schedule(event=None):
@@ -653,7 +664,7 @@ class SchedulingTool:
 
             # Draw time grid lines
             for i in range(len(self.timeslots)):
-                y = i * 60
+                y = i * SLOT_HEIGHT
                 day_canvas.create_line(0, y, canvas_width, y,
                                       fill=self.colors['border'],
                                       width=1)
@@ -663,55 +674,50 @@ class SchedulingTool:
                 # Calculate block width
                 block_width = (canvas_width - 10) / desks
 
-                # Track lanes
-                lane_assignments = {}
+                # Track lane assignments: {lane: [(start, end), ...]}
+                lanes = [[] for _ in range(desks)]
 
                 people_shifts = list(self.schedule[day].items())
-                people_shifts.sort(key=lambda x: x[1]['start'])
+                people_shifts.sort(key=lambda x: (x[1]['start'], x[1]['end']))
 
                 for person_name, shift in people_shifts:
                     start_idx = shift['start']
                     end_idx = shift['end']
                     is_short = shift.get('is_short', False)
 
-                    # Find available lane
-                    lane = 0
-                    for i in range(start_idx, end_idx):
-                        if i in slot_counts:
-                            current_lane_count = len([p for p, s in lane_assignments.items()
-                                                     if s['start'] <= i < s['end']])
-                            lane = max(lane, current_lane_count)
+                    # Find first available lane where this shift doesn't overlap
+                    assigned_lane = None
+                    for lane_idx in range(desks):
+                        # Check if this shift overlaps with any shift in this lane
+                        overlaps = False
+                        for existing_start, existing_end in lanes[lane_idx]:
+                            # Check for overlap: shifts overlap if one starts before the other ends
+                            if not (end_idx <= existing_start or start_idx >= existing_end):
+                                overlaps = True
+                                break
 
-                    lane_assignments[person_name] = shift
+                        if not overlaps:
+                            assigned_lane = lane_idx
+                            lanes[lane_idx].append((start_idx, end_idx))
+                            break
+
+                    if assigned_lane is None:
+                        # Shouldn't happen if desk count is correct, but fallback to lane 0
+                        assigned_lane = 0
 
                     # Calculate position
-                    y1 = start_idx * 60 + 5
-                    y2 = end_idx * 60 - 5
-                    x1 = 5 + (lane * block_width)
+                    y1 = start_idx * SLOT_HEIGHT + 3
+                    y2 = end_idx * SLOT_HEIGHT - 3
+                    x1 = 5 + (assigned_lane * block_width)
                     x2 = x1 + block_width - 5
 
                     # Get color
                     color = self.person_colors.get(person_name, self.colors['accent'])
 
-                    # Draw rounded rectangle (simulate with multiple lines)
+                    # Draw rounded rectangle with rounded border
                     radius = 8
-                    day_canvas.create_arc(x1, y1, x1+radius*2, y1+radius*2,
-                                         start=90, extent=90, fill=color, outline="")
-                    day_canvas.create_arc(x2-radius*2, y1, x2, y1+radius*2,
-                                         start=0, extent=90, fill=color, outline="")
-                    day_canvas.create_arc(x1, y2-radius*2, x1+radius*2, y2,
-                                         start=180, extent=90, fill=color, outline="")
-                    day_canvas.create_arc(x2-radius*2, y2-radius*2, x2, y2,
-                                         start=270, extent=90, fill=color, outline="")
-                    day_canvas.create_rectangle(x1+radius, y1, x2-radius, y2,
-                                                fill=color, outline="")
-                    day_canvas.create_rectangle(x1, y1+radius, x2, y2-radius,
-                                                fill=color, outline="")
-
-                    # Draw border
-                    day_canvas.create_rectangle(x1, y1, x2, y2,
-                                               outline=self.colors['border'],
-                                               width=2)
+                    self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
+                                          fill=color, outline=self.colors['border'], width=2)
 
                     # Add name
                     display_name = self.get_display_name(person_name)
@@ -726,6 +732,46 @@ class SchedulingTool:
 
         day_canvas.bind('<Configure>', draw_schedule)
         day_canvas.after(100, draw_schedule)
+
+    def draw_rounded_rect(self, canvas, x1, y1, x2, y2, radius, **kwargs):
+        """Draw a rounded rectangle on canvas"""
+        fill = kwargs.get('fill', '')
+        outline = kwargs.get('outline', '')
+        width = kwargs.get('width', 1)
+
+        # Draw filled rounded rectangle
+        if fill:
+            canvas.create_arc(x1, y1, x1+radius*2, y1+radius*2,
+                             start=90, extent=90, fill=fill, outline="")
+            canvas.create_arc(x2-radius*2, y1, x2, y1+radius*2,
+                             start=0, extent=90, fill=fill, outline="")
+            canvas.create_arc(x1, y2-radius*2, x1+radius*2, y2,
+                             start=180, extent=90, fill=fill, outline="")
+            canvas.create_arc(x2-radius*2, y2-radius*2, x2, y2,
+                             start=270, extent=90, fill=fill, outline="")
+            canvas.create_rectangle(x1+radius, y1, x2-radius, y2,
+                                   fill=fill, outline="")
+            canvas.create_rectangle(x1, y1+radius, x2, y2-radius,
+                                   fill=fill, outline="")
+
+        # Draw rounded outline
+        if outline:
+            canvas.create_arc(x1, y1, x1+radius*2, y1+radius*2,
+                             start=90, extent=90, outline=outline, width=width, style='arc')
+            canvas.create_arc(x2-radius*2, y1, x2, y1+radius*2,
+                             start=0, extent=90, outline=outline, width=width, style='arc')
+            canvas.create_arc(x1, y2-radius*2, x1+radius*2, y2,
+                             start=180, extent=90, outline=outline, width=width, style='arc')
+            canvas.create_arc(x2-radius*2, y2-radius*2, x2, y2,
+                             start=270, extent=90, outline=outline, width=width, style='arc')
+            canvas.create_line(x1+radius, y1, x2-radius, y1,
+                              fill=outline, width=width)
+            canvas.create_line(x1+radius, y2, x2-radius, y2,
+                              fill=outline, width=width)
+            canvas.create_line(x1, y1+radius, x1, y2-radius,
+                              fill=outline, width=width)
+            canvas.create_line(x2, y1+radius, x2, y2-radius,
+                              fill=outline, width=width)
 
     def display_hours(self):
         # Clear previous display
