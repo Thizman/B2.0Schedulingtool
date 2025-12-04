@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import copy
 import random
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 class SchedulingTool:
     def __init__(self, root):
@@ -51,8 +53,12 @@ class SchedulingTool:
         # Configuration variables
         self.csv_file_path = None
         self.week_number = tk.StringVar(value="1")
-        self.desks_available = tk.StringVar(value="2")
+        self.desks_monday = tk.StringVar(value="2")
+        self.desks_tuesday = tk.StringVar(value="2")
+        self.desks_wednesday = tk.StringVar(value="2")
+        self.desks_thursday = tk.StringVar(value="2")
         self.min_shift_length = tk.StringVar(value="3")
+        self.total_hours_target = tk.StringVar(value="100")
 
         self.setup_styles()
         self.setup_ui()
@@ -166,13 +172,13 @@ class SchedulingTool:
         config_container = tk.Frame(parent, bg=self.colors['bg_dark'])
         config_container.grid(row=0, column=0, sticky=tk.W, pady=(10, 10), padx=10)
 
-        # Canvas for rounded border
-        canvas = tk.Canvas(config_container, width=500, height=200,
+        # Canvas for rounded border (increased size to fit all inputs)
+        canvas = tk.Canvas(config_container, width=700, height=280,
                           bg=self.colors['bg_dark'], highlightthickness=0)
         canvas.pack()
 
         # Draw rounded rectangle border
-        self.draw_rounded_rect(canvas, 2, 2, 498, 198, 10,
+        self.draw_rounded_rect(canvas, 2, 2, 698, 278, 10,
                               fill=self.colors['bg_dark'],
                               outline=self.colors['border'], width=2)
 
@@ -189,58 +195,84 @@ class SchedulingTool:
         row_y = 0
         tk.Label(config_frame, text="CSV File:",
                 bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
-                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=3)
         self.file_label = tk.Label(config_frame, text="No file selected",
                                    fg=self.colors['error'], bg=self.colors['bg_dark'],
                                    font=("Consolas", 9))
-        self.file_label.grid(row=row_y, column=1, sticky=tk.W, padx=5)
+        self.file_label.grid(row=row_y, column=1, columnspan=2, sticky=tk.W, padx=5)
 
         browse_btn = tk.Button(config_frame, text="Browse", command=self.load_csv,
                               bg=self.colors['bg_light'], fg=self.colors['text_primary'],
                               font=("Consolas", 9), relief=tk.FLAT, padx=10, pady=3,
                               cursor="hand2")
-        browse_btn.grid(row=row_y, column=2, padx=5)
+        browse_btn.grid(row=row_y, column=3, padx=5)
 
-        # Week number
+        # Week number and Total hours target in same row
         row_y += 1
         tk.Label(config_frame, text="Week Number:",
                 bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
-                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
-        week_entry = tk.Entry(config_frame, textvariable=self.week_number, width=12,
-                             bg=self.colors['bg_light'], fg=self.colors['text_primary'],
-                             insertbackground=self.colors['text_primary'],
-                             font=("Consolas", 9), relief=tk.FLAT)
-        week_entry.grid(row=row_y, column=1, sticky=tk.W, padx=5)
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=3)
+        tk.Entry(config_frame, textvariable=self.week_number, width=8,
+                bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                insertbackground=self.colors['text_primary'],
+                font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y, column=1, sticky=tk.W, padx=5)
 
-        # Desks available
-        row_y += 1
-        tk.Label(config_frame, text="Desks Available:",
+        tk.Label(config_frame, text="Total Hours Target:",
                 bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
-                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
-        desks_entry = tk.Entry(config_frame, textvariable=self.desks_available, width=12,
-                              bg=self.colors['bg_light'], fg=self.colors['text_primary'],
-                              insertbackground=self.colors['text_primary'],
-                              font=("Consolas", 9), relief=tk.FLAT)
-        desks_entry.grid(row=row_y, column=1, sticky=tk.W, padx=5)
+                font=("Consolas", 9)).grid(row=row_y, column=2, sticky=tk.W, padx=(15, 5), pady=3)
+        tk.Entry(config_frame, textvariable=self.total_hours_target, width=8,
+                bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                insertbackground=self.colors['text_primary'],
+                font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y, column=3, sticky=tk.W, padx=5)
 
         # Min shift length
         row_y += 1
         tk.Label(config_frame, text="Min Shift Length (hours):",
                 bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
-                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
-        min_shift_entry = tk.Entry(config_frame, textvariable=self.min_shift_length, width=12,
-                                   bg=self.colors['bg_light'], fg=self.colors['text_primary'],
-                                   insertbackground=self.colors['text_primary'],
-                                   font=("Consolas", 9), relief=tk.FLAT)
-        min_shift_entry.grid(row=row_y, column=1, sticky=tk.W, padx=5)
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=3)
+        tk.Entry(config_frame, textvariable=self.min_shift_length, width=8,
+                bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                insertbackground=self.colors['text_primary'],
+                font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y, column=1, sticky=tk.W, padx=5)
 
-        # Generate schedule button
+        # Desks per day header
         row_y += 1
+        tk.Label(config_frame, text="Desks Available Per Day:",
+                bg=self.colors['bg_dark'], fg=self.colors['accent'],
+                font=("Consolas", 9, "bold")).grid(row=row_y, column=0, columnspan=4, sticky=tk.W, padx=5, pady=(10, 3))
+
+        # Desks for each day
+        row_y += 1
+        desk_vars = [
+            ("Monday:", self.desks_monday),
+            ("Tuesday:", self.desks_tuesday),
+            ("Wednesday:", self.desks_wednesday),
+            ("Thursday:", self.desks_thursday)
+        ]
+
+        for i, (label, var) in enumerate(desk_vars):
+            col_offset = i * 2
+            tk.Label(config_frame, text=label,
+                    bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                    font=("Consolas", 9)).grid(row=row_y + (i // 2), column=col_offset, sticky=tk.W, padx=5, pady=3)
+            tk.Entry(config_frame, textvariable=var, width=6,
+                    bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                    insertbackground=self.colors['text_primary'],
+                    font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y + (i // 2), column=col_offset+1, sticky=tk.W, padx=5)
+
+        # Generate and Export buttons
+        row_y += 2
         gen_btn = tk.Button(config_frame, text="Generate Schedule", command=self.generate_schedule,
                            bg=self.colors['accent'], fg=self.colors['text_primary'],
                            font=("Consolas", 10, "bold"), relief=tk.FLAT,
-                           padx=20, pady=8, cursor="hand2")
-        gen_btn.grid(row=row_y, column=0, columnspan=3, pady=15)
+                           padx=15, pady=6, cursor="hand2")
+        gen_btn.grid(row=row_y, column=0, columnspan=2, pady=10, sticky=tk.W)
+
+        export_btn = tk.Button(config_frame, text="Export as PNG", command=self.export_schedule,
+                              bg=self.colors['success'], fg=self.colors['text_primary'],
+                              font=("Consolas", 10, "bold"), relief=tk.FLAT,
+                              padx=15, pady=6, cursor="hand2")
+        export_btn.grid(row=row_y, column=2, columnspan=2, pady=10, sticky=tk.W, padx=(15, 0))
 
         # Hover effects for buttons
         def on_enter(e, btn, color):
@@ -252,24 +284,70 @@ class SchedulingTool:
         browse_btn.bind("<Leave>", lambda e: on_leave(e, browse_btn, self.colors['bg_light']))
         gen_btn.bind("<Enter>", lambda e: on_enter(e, gen_btn, self.colors['accent_hover']))
         gen_btn.bind("<Leave>", lambda e: on_leave(e, gen_btn, self.colors['accent']))
+        export_btn.bind("<Enter>", lambda e: on_enter(e, export_btn, '#6ec57e'))
+        export_btn.bind("<Leave>", lambda e: on_leave(e, export_btn, self.colors['success']))
 
 
     def setup_display_section(self, parent):
-        # Create notebook for tabs with rounded borders
-        notebook = ttk.Notebook(parent)
-        notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=(10, 20))
+        # Create container for side-by-side layout
+        display_container = tk.Frame(parent, bg=self.colors['bg_dark'])
+        display_container.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=(10, 20))
 
-        # Schedule tab
-        self.schedule_frame = ttk.Frame(notebook)
-        notebook.add(self.schedule_frame, text="Weekly Schedule")
+        # Configure grid weights
+        display_container.columnconfigure(0, weight=3)  # Schedule gets more space
+        display_container.columnconfigure(1, weight=1)  # Hours gets less space
 
-        # Hours tracker tab
-        self.hours_frame = ttk.Frame(notebook)
-        notebook.add(self.hours_frame, text="Hours Tracker")
+        # Schedule section (left side)
+        schedule_container = tk.Frame(display_container, bg=self.colors['bg_dark'])
+        schedule_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+
+        # Create canvas for schedule with rounded border
+        schedule_canvas_width = 1100
+        schedule_canvas_height = 750
+        self.schedule_canvas_border = tk.Canvas(schedule_container,
+                                               width=schedule_canvas_width,
+                                               height=schedule_canvas_height,
+                                               bg=self.colors['bg_dark'],
+                                               highlightthickness=0)
+        self.schedule_canvas_border.pack()
+
+        # Draw rounded border for schedule
+        self.draw_rounded_rect(self.schedule_canvas_border, 2, 2,
+                              schedule_canvas_width-2, schedule_canvas_height-2, 10,
+                              fill=self.colors['bg_dark'],
+                              outline=self.colors['border'], width=2)
+
+        # Create frame for schedule content
+        self.schedule_frame = tk.Frame(self.schedule_canvas_border, bg=self.colors['bg_dark'])
+        self.schedule_canvas_border.create_window(10, 10, window=self.schedule_frame, anchor=tk.NW)
+
+        # Hours section (right side)
+        hours_container = tk.Frame(display_container, bg=self.colors['bg_dark'])
+        hours_container.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Create canvas for hours with rounded border
+        hours_canvas_width = 450
+        hours_canvas_height = 750
+        self.hours_canvas_border = tk.Canvas(hours_container,
+                                            width=hours_canvas_width,
+                                            height=hours_canvas_height,
+                                            bg=self.colors['bg_dark'],
+                                            highlightthickness=0)
+        self.hours_canvas_border.pack()
+
+        # Draw rounded border for hours
+        self.draw_rounded_rect(self.hours_canvas_border, 2, 2,
+                              hours_canvas_width-2, hours_canvas_height-2, 10,
+                              fill=self.colors['bg_dark'],
+                              outline=self.colors['border'], width=2)
+
+        # Create frame for hours content
+        self.hours_frame = tk.Frame(self.hours_canvas_border, bg=self.colors['bg_dark'])
+        self.hours_canvas_border.create_window(10, 10, window=self.hours_frame, anchor=tk.NW)
 
         # Show placeholder initially
-        self.show_placeholder(self.schedule_frame, "Load a CSV file and click 'Generate Schedule' to begin")
-        self.show_placeholder(self.hours_frame, "Hours tracking will appear here after schedule generation")
+        self.show_placeholder(self.schedule_frame, "Load CSV and Generate Schedule")
+        self.show_placeholder(self.hours_frame, "Hours Tracker")
 
     def show_placeholder(self, parent, message):
         """Show a placeholder message in empty frames"""
