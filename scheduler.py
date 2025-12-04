@@ -162,30 +162,96 @@ class SchedulingTool:
         self.setup_display_section(self.scrollable_frame)
 
     def setup_config_section(self, parent):
-        config_frame = ttk.LabelFrame(parent, text="Configuration", padding="10")
-        config_frame.grid(row=0, column=0, sticky=tk.W, pady=(0, 10), padx=10)  # Remove tk.E to prevent stretching
+        # Create a canvas-based rounded frame for configuration
+        config_container = tk.Frame(parent, bg=self.colors['bg_dark'])
+        config_container.grid(row=0, column=0, sticky=tk.W, pady=(10, 10), padx=10)
+
+        # Canvas for rounded border
+        canvas = tk.Canvas(config_container, width=500, height=200,
+                          bg=self.colors['bg_dark'], highlightthickness=0)
+        canvas.pack()
+
+        # Draw rounded rectangle border
+        self.draw_rounded_rect(canvas, 2, 2, 498, 198, 10,
+                              fill=self.colors['bg_dark'],
+                              outline=self.colors['border'], width=2)
+
+        # Title
+        canvas.create_text(20, 15, text="Configuration",
+                          font=("Consolas", 11, "bold"),
+                          fill=self.colors['accent'], anchor=tk.W)
+
+        # Create frame for inputs inside canvas
+        config_frame = tk.Frame(canvas, bg=self.colors['bg_dark'])
+        canvas.create_window(20, 40, window=config_frame, anchor=tk.NW)
 
         # CSV File selection
-        ttk.Label(config_frame, text="CSV File:").grid(row=0, column=0, sticky=tk.W, padx=5)
-        self.file_label = ttk.Label(config_frame, text="No file selected", foreground=self.colors['error'])
-        self.file_label.grid(row=0, column=1, sticky=tk.W, padx=5)
-        ttk.Button(config_frame, text="Browse", command=self.load_csv).grid(row=0, column=2, padx=5)
+        row_y = 0
+        tk.Label(config_frame, text="CSV File:",
+                bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
+        self.file_label = tk.Label(config_frame, text="No file selected",
+                                   fg=self.colors['error'], bg=self.colors['bg_dark'],
+                                   font=("Consolas", 9))
+        self.file_label.grid(row=row_y, column=1, sticky=tk.W, padx=5)
+
+        browse_btn = tk.Button(config_frame, text="Browse", command=self.load_csv,
+                              bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                              font=("Consolas", 9), relief=tk.FLAT, padx=10, pady=3,
+                              cursor="hand2")
+        browse_btn.grid(row=row_y, column=2, padx=5)
 
         # Week number
-        ttk.Label(config_frame, text="Week Number:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
-        ttk.Entry(config_frame, textvariable=self.week_number, width=10).grid(row=1, column=1, sticky=tk.W, padx=5)
+        row_y += 1
+        tk.Label(config_frame, text="Week Number:",
+                bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
+        week_entry = tk.Entry(config_frame, textvariable=self.week_number, width=12,
+                             bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                             insertbackground=self.colors['text_primary'],
+                             font=("Consolas", 9), relief=tk.FLAT)
+        week_entry.grid(row=row_y, column=1, sticky=tk.W, padx=5)
 
         # Desks available
-        ttk.Label(config_frame, text="Desks Available:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
-        ttk.Entry(config_frame, textvariable=self.desks_available, width=10).grid(row=2, column=1, sticky=tk.W, padx=5)
+        row_y += 1
+        tk.Label(config_frame, text="Desks Available:",
+                bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
+        desks_entry = tk.Entry(config_frame, textvariable=self.desks_available, width=12,
+                              bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                              insertbackground=self.colors['text_primary'],
+                              font=("Consolas", 9), relief=tk.FLAT)
+        desks_entry.grid(row=row_y, column=1, sticky=tk.W, padx=5)
 
         # Min shift length
-        ttk.Label(config_frame, text="Min Shift Length (hours):").grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
-        ttk.Entry(config_frame, textvariable=self.min_shift_length, width=10).grid(row=3, column=1, sticky=tk.W, padx=5)
+        row_y += 1
+        tk.Label(config_frame, text="Min Shift Length (hours):",
+                bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=5)
+        min_shift_entry = tk.Entry(config_frame, textvariable=self.min_shift_length, width=12,
+                                   bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                                   insertbackground=self.colors['text_primary'],
+                                   font=("Consolas", 9), relief=tk.FLAT)
+        min_shift_entry.grid(row=row_y, column=1, sticky=tk.W, padx=5)
 
         # Generate schedule button
-        ttk.Button(config_frame, text="Generate Schedule", command=self.generate_schedule,
-                   style="Accent.TButton").grid(row=4, column=0, columnspan=3, pady=10)
+        row_y += 1
+        gen_btn = tk.Button(config_frame, text="Generate Schedule", command=self.generate_schedule,
+                           bg=self.colors['accent'], fg=self.colors['text_primary'],
+                           font=("Consolas", 10, "bold"), relief=tk.FLAT,
+                           padx=20, pady=8, cursor="hand2")
+        gen_btn.grid(row=row_y, column=0, columnspan=3, pady=15)
+
+        # Hover effects for buttons
+        def on_enter(e, btn, color):
+            btn['bg'] = color
+        def on_leave(e, btn, color):
+            btn['bg'] = color
+
+        browse_btn.bind("<Enter>", lambda e: on_enter(e, browse_btn, self.colors['bg_medium']))
+        browse_btn.bind("<Leave>", lambda e: on_leave(e, browse_btn, self.colors['bg_light']))
+        gen_btn.bind("<Enter>", lambda e: on_enter(e, gen_btn, self.colors['accent_hover']))
+        gen_btn.bind("<Leave>", lambda e: on_leave(e, gen_btn, self.colors['accent']))
 
 
     def setup_display_section(self, parent):
@@ -249,10 +315,10 @@ class SchedulingTool:
             try:
                 self.csv_file_path = file_path
                 self.parse_csv()
-                self.file_label.config(text=file_path.split('/')[-1], foreground=self.colors['success'])
+                self.file_label.config(text=file_path.split('/')[-1], fg=self.colors['success'])
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load CSV: {str(e)}")
-                self.file_label.config(text="Error loading file", foreground=self.colors['error'])
+                self.file_label.config(text="Error loading file", fg=self.colors['error'])
 
     def parse_csv(self):
         self.people = []
