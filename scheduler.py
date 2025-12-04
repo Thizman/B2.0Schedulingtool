@@ -383,6 +383,66 @@ class SchedulingTool:
         except ValueError:
             return "Invalid week number"
 
+    def export_schedule(self):
+        """Export the schedule and hours tracker as PNG"""
+        if not self.schedule_generated:
+            messagebox.showwarning("Warning", "Please generate a schedule first")
+            return
+
+        try:
+            # Get week info for filename
+            week_num = int(self.week_number.get())
+            week_text = self.get_week_display_text()
+            # Extract dates from week text
+            import re
+            dates_match = re.search(r'(\w+ \d+) - (\w+ \d+, \d+)', week_text)
+            if dates_match:
+                start_date = dates_match.group(1).replace(' ', '-')
+                end_date = dates_match.group(2).replace(' ', '-').replace(',', '')
+                filename = f"B2.0 Schedule week {week_num} ({start_date}_{end_date}).png"
+            else:
+                filename = f"B2.0 Schedule week {week_num}.png"
+
+            # Ask user where to save
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png")],
+                initialfile=filename
+            )
+
+            if not file_path:
+                return
+
+            # Update to ensure latest rendering
+            self.root.update()
+
+            # Get the bounding boxes of both canvases
+            x1_sched = self.schedule_canvas_border.winfo_rootx()
+            y1_sched = self.schedule_canvas_border.winfo_rooty()
+            x2_sched = x1_sched + self.schedule_canvas_border.winfo_width()
+            y2_sched = y1_sched + self.schedule_canvas_border.winfo_height()
+
+            x1_hours = self.hours_canvas_border.winfo_rootx()
+            y1_hours = self.hours_canvas_border.winfo_rooty()
+            x2_hours = x1_hours + self.hours_canvas_border.winfo_width()
+            y2_hours = y1_hours + self.hours_canvas_border.winfo_height()
+
+            # Calculate combined bounding box
+            x1 = min(x1_sched, x1_hours)
+            y1 = min(y1_sched, y1_hours)
+            x2 = max(x2_sched, x2_hours)
+            y2 = max(y2_sched, y2_hours)
+
+            # Capture screenshot using PIL
+            import PIL.ImageGrab as ImageGrab
+            img = ImageGrab.grab(bbox=(x1, y1, x2, y2))
+            img.save(file_path)
+
+            messagebox.showinfo("Success", f"Schedule exported to:\n{file_path}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export schedule: {str(e)}")
+
     def load_csv(self):
         file_path = filedialog.askopenfilename(
             title="Select CSV File",
@@ -449,10 +509,17 @@ class SchedulingTool:
             return
 
         try:
-            desks = int(self.desks_available.get())
+            # Parse per-day desks
+            self.desks_per_day = {
+                'Monday': int(self.desks_monday.get()),
+                'Tuesday': int(self.desks_tuesday.get()),
+                'Wednesday': int(self.desks_wednesday.get()),
+                'Thursday': int(self.desks_thursday.get())
+            }
             min_shift = int(self.min_shift_length.get())
+            total_hours_target = int(self.total_hours_target.get())
         except ValueError:
-            messagebox.showerror("Error", "Please enter valid numbers for desks and min shift length")
+            messagebox.showerror("Error", "Please enter valid numbers for all configuration fields")
             return
 
         # Generate colors for people
@@ -465,8 +532,8 @@ class SchedulingTool:
         # For algorithm: track old style (slot: [people])
         self.temp_schedule = {day: {i: [] for i in range(len(self.timeslots) - 1)} for day in self.day_names}
 
-        # Run scheduling algorithm
-        self.run_scheduling_algorithm(desks, min_shift)
+        # Run scheduling algorithm with per-day desks and target hours
+        self.run_scheduling_algorithm(self.desks_per_day, min_shift, total_hours_target)
 
         # Convert temp_schedule to person-centric schedule
         self.convert_to_person_schedule(min_shift)
@@ -509,14 +576,15 @@ class SchedulingTool:
 
             self.schedule[day] = person_shifts
 
-    def run_scheduling_algorithm(self, desks, min_shift):
+    def run_scheduling_algorithm(self, desks_per_day, min_shift, total_hours_target):
         """
         Scheduling algorithm with priorities:
         1. Equal distribution across all timeslots
-        2. Fill as many desks as possible
+        2. Fill as many desks as possible (per day)
         3. Everyone gets at least one shift
         4. Respect minimum shift length
-        5. Prioritize preferred -> agreed -> max hours
+        5. Try to reach total hours target
+        6. Prioritize preferred -> agreed -> max hours
         """
 
         # Track how many people are in each timeslot (for equal distribution)
