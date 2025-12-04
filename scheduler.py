@@ -272,7 +272,7 @@ class SchedulingTool:
                 bg=self.colors['bg_dark'], fg=self.colors['accent'],
                 font=("Consolas", 9, "bold")).grid(row=row_y, column=0, columnspan=4, sticky=tk.W, padx=5, pady=(10, 3))
 
-        # Desks for each day
+        # Desks for each day in 2x2 grid
         row_y += 1
         desk_vars = [
             ("Monday:", self.desks_monday),
@@ -281,15 +281,18 @@ class SchedulingTool:
             ("Thursday:", self.desks_thursday)
         ]
 
+        # Create 2x2 grid: row 0 = Monday, Tuesday; row 1 = Wednesday, Thursday
         for i, (label, var) in enumerate(desk_vars):
-            col_offset = i * 2
+            grid_row = row_y + (i // 2)  # Row 0 for first 2, row 1 for last 2
+            grid_col = (i % 2) * 2  # Column 0 or 2 (label), then +1 for entry
+
             tk.Label(config_frame, text=label,
                     bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
-                    font=("Consolas", 9)).grid(row=row_y + (i // 2), column=col_offset, sticky=tk.W, padx=5, pady=3)
+                    font=("Consolas", 9)).grid(row=grid_row, column=grid_col, sticky=tk.W, padx=5, pady=3)
             tk.Entry(config_frame, textvariable=var, width=6,
                     bg=self.colors['bg_light'], fg=self.colors['text_primary'],
                     insertbackground=self.colors['text_primary'],
-                    font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y + (i // 2), column=col_offset+1, sticky=tk.W, padx=5)
+                    font=("Consolas", 9), relief=tk.FLAT).grid(row=grid_row, column=grid_col+1, sticky=tk.W, padx=5)
 
         # Generate and Export buttons
         row_y += 2
@@ -325,22 +328,22 @@ class SchedulingTool:
         display_container.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=(10, 20))
 
         # Configure grid weights
-        display_container.columnconfigure(0, weight=3)  # Schedule gets more space
+        display_container.columnconfigure(0, weight=2)  # Schedule gets more space
         display_container.columnconfigure(1, weight=1)  # Hours gets less space
 
-        # Schedule section (left side)
+        # Schedule section (left side) with scrollable canvas
         schedule_container = tk.Frame(display_container, bg=self.colors['bg_dark'])
         schedule_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
 
-        # Create canvas for schedule with rounded border
-        schedule_canvas_width = 1100
-        schedule_canvas_height = 750
+        # Create outer canvas with rounded border for schedule
+        schedule_canvas_width = 900
+        schedule_canvas_height = 800
         self.schedule_canvas_border = tk.Canvas(schedule_container,
                                                width=schedule_canvas_width,
                                                height=schedule_canvas_height,
                                                bg=self.colors['bg_dark'],
                                                highlightthickness=0)
-        self.schedule_canvas_border.pack()
+        self.schedule_canvas_border.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Draw rounded border for schedule
         self.draw_rounded_rect(self.schedule_canvas_border, 2, 2,
@@ -348,23 +351,38 @@ class SchedulingTool:
                               fill=self.colors['bg_dark'],
                               outline=self.colors['border'], width=2)
 
-        # Create frame for schedule content
-        self.schedule_frame = tk.Frame(self.schedule_canvas_border, bg=self.colors['bg_dark'])
-        self.schedule_canvas_border.create_window(10, 10, window=self.schedule_frame, anchor=tk.NW)
+        # Create scrollable inner canvas for schedule content
+        self.schedule_inner_canvas = tk.Canvas(self.schedule_canvas_border,
+                                              bg=self.colors['bg_dark'],
+                                              highlightthickness=0)
+        schedule_scrollbar = ttk.Scrollbar(self.schedule_canvas_border,
+                                          orient="vertical",
+                                          command=self.schedule_inner_canvas.yview)
 
-        # Hours section (right side)
+        self.schedule_frame = tk.Frame(self.schedule_inner_canvas, bg=self.colors['bg_dark'])
+        self.schedule_frame.bind("<Configure>",
+                                lambda e: self.schedule_inner_canvas.configure(scrollregion=self.schedule_inner_canvas.bbox("all")))
+
+        self.schedule_canvas_border.create_window(15, 15, window=self.schedule_inner_canvas,
+                                                 width=schedule_canvas_width-45,
+                                                 height=schedule_canvas_height-30, anchor=tk.NW)
+
+        self.schedule_inner_canvas.create_window((0, 0), window=self.schedule_frame, anchor=tk.NW)
+        self.schedule_inner_canvas.configure(yscrollcommand=schedule_scrollbar.set)
+
+        # Hours section (right side) with scrollable canvas
         hours_container = tk.Frame(display_container, bg=self.colors['bg_dark'])
         hours_container.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        # Create canvas for hours with rounded border
-        hours_canvas_width = 450
-        hours_canvas_height = 750
+        # Create outer canvas with rounded border for hours
+        hours_canvas_width = 400
+        hours_canvas_height = 800
         self.hours_canvas_border = tk.Canvas(hours_container,
                                             width=hours_canvas_width,
                                             height=hours_canvas_height,
                                             bg=self.colors['bg_dark'],
                                             highlightthickness=0)
-        self.hours_canvas_border.pack()
+        self.hours_canvas_border.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Draw rounded border for hours
         self.draw_rounded_rect(self.hours_canvas_border, 2, 2,
@@ -372,9 +390,24 @@ class SchedulingTool:
                               fill=self.colors['bg_dark'],
                               outline=self.colors['border'], width=2)
 
-        # Create frame for hours content
-        self.hours_frame = tk.Frame(self.hours_canvas_border, bg=self.colors['bg_dark'])
-        self.hours_canvas_border.create_window(10, 10, window=self.hours_frame, anchor=tk.NW)
+        # Create scrollable inner canvas for hours content
+        self.hours_inner_canvas = tk.Canvas(self.hours_canvas_border,
+                                           bg=self.colors['bg_dark'],
+                                           highlightthickness=0)
+        hours_scrollbar = ttk.Scrollbar(self.hours_canvas_border,
+                                       orient="vertical",
+                                       command=self.hours_inner_canvas.yview)
+
+        self.hours_frame = tk.Frame(self.hours_inner_canvas, bg=self.colors['bg_dark'])
+        self.hours_frame.bind("<Configure>",
+                             lambda e: self.hours_inner_canvas.configure(scrollregion=self.hours_inner_canvas.bbox("all")))
+
+        self.hours_canvas_border.create_window(15, 15, window=self.hours_inner_canvas,
+                                              width=hours_canvas_width-30,
+                                              height=hours_canvas_height-30, anchor=tk.NW)
+
+        self.hours_inner_canvas.create_window((0, 0), window=self.hours_frame, anchor=tk.NW)
+        self.hours_inner_canvas.configure(yscrollcommand=hours_scrollbar.set)
 
         # Show placeholder initially
         self.show_placeholder(self.schedule_frame, "Load CSV and Generate Schedule")
@@ -444,35 +477,221 @@ class SchedulingTool:
             if not file_path:
                 return
 
-            # Update to ensure latest rendering
-            self.root.update()
-
-            # Get the bounding boxes of both canvases
-            x1_sched = self.schedule_canvas_border.winfo_rootx()
-            y1_sched = self.schedule_canvas_border.winfo_rooty()
-            x2_sched = x1_sched + self.schedule_canvas_border.winfo_width()
-            y2_sched = y1_sched + self.schedule_canvas_border.winfo_height()
-
-            x1_hours = self.hours_canvas_border.winfo_rootx()
-            y1_hours = self.hours_canvas_border.winfo_rooty()
-            x2_hours = x1_hours + self.hours_canvas_border.winfo_width()
-            y2_hours = y1_hours + self.hours_canvas_border.winfo_height()
-
-            # Calculate combined bounding box
-            x1 = min(x1_sched, x1_hours)
-            y1 = min(y1_sched, y1_hours)
-            x2 = max(x2_sched, x2_hours)
-            y2 = max(y2_sched, y2_hours)
-
-            # Capture screenshot using PIL
-            import PIL.ImageGrab as ImageGrab
-            img = ImageGrab.grab(bbox=(x1, y1, x2, y2))
-            img.save(file_path)
+            # Create image programmatically
+            self.create_export_image(file_path, week_text)
 
             messagebox.showinfo("Success", f"Schedule exported to:\n{file_path}")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export schedule: {str(e)}")
+
+    def create_export_image(self, file_path, week_text):
+        """Create a professional PNG export of schedule and hours"""
+        # Image dimensions
+        img_width = 1400
+        img_height = 1000
+
+        # Create image with dark background
+        img = Image.new('RGB', (img_width, img_height), color='#2a2a2a')
+        draw = ImageDraw.Draw(img)
+
+        try:
+            # Try to load fonts
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 16)
+            header_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 13)
+            normal_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 10)
+            small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 9)
+        except:
+            # Fallback to default font
+            title_font = ImageFont.load_default()
+            header_font = ImageFont.load_default()
+            normal_font = ImageFont.load_default()
+            small_font = ImageFont.load_default()
+
+        # Colors
+        bg_dark = '#2a2a2a'
+        bg_medium = '#3a3a3a'
+        text_primary = '#e8e8e8'
+        text_muted = '#808080'
+        accent = '#d4734b'
+        border = '#5a5a5a'
+        error = '#d44747'
+        success = '#5eb56e'
+        warning_color = '#d4734b'
+
+        # Draw title
+        draw.text((30, 30), week_text, fill=accent, font=title_font)
+
+        # Schedule section (left side)
+        schedule_x = 30
+        schedule_y = 70
+        day_width = 330
+        day_height = 400
+
+        # Draw 2x2 grid of days
+        positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
+
+        for idx, day in enumerate(self.day_names):
+            row, col = positions[idx]
+            x = schedule_x + (col * (day_width + 20))
+            y = schedule_y + (row * (day_height + 20))
+
+            # Draw day container border
+            draw.rectangle([x, y, x + day_width, y + day_height],
+                          outline=border, width=2)
+
+            # Draw day header
+            draw.rectangle([x, y, x + day_width, y + 35],
+                          fill=bg_medium, outline=border, width=1)
+            draw.text((x + 10, y + 10), day, fill=text_primary, font=header_font)
+
+            # Get desk count for this day
+            desks = self.desks_per_day[day]
+            min_shift = int(self.min_shift_length.get())
+
+            # Draw timeslots and schedule
+            slot_height = 40
+            time_x = x + 10
+            content_start_y = y + 45
+
+            # Count slot capacity
+            slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
+            if day in self.schedule:
+                for person_name, shift in self.schedule[day].items():
+                    for i in range(shift['start'], shift['end']):
+                        if i in slot_counts:
+                            slot_counts[i] += 1
+
+            # Draw time labels and warnings
+            for i, time in enumerate(self.timeslots[:-1]):
+                time_y = content_start_y + (i * slot_height)
+
+                # Time label
+                draw.text((time_x, time_y), time, fill=text_muted, font=small_font)
+
+                # Warning if understaffed
+                if slot_counts[i] < desks:
+                    warning_text = f"⚠ {slot_counts[i]}/{desks}"
+                    draw.text((time_x + 50, time_y), warning_text, fill=error, font=small_font)
+
+            # Draw schedule blocks
+            if day in self.schedule:
+                block_width = (day_width - 120) // desks
+                lanes = [[] for _ in range(desks)]
+
+                people_shifts = list(self.schedule[day].items())
+                people_shifts.sort(key=lambda x: (x[1]['start'], x[1]['end']))
+
+                for person_name, shift in people_shifts:
+                    start_idx = shift['start']
+                    end_idx = shift['end']
+                    is_short = shift.get('is_short', False)
+
+                    # Find available lane
+                    assigned_lane = None
+                    for lane_idx in range(desks):
+                        overlaps = False
+                        for existing_start, existing_end in lanes[lane_idx]:
+                            if not (end_idx <= existing_start or start_idx >= existing_end):
+                                overlaps = True
+                                break
+                        if not overlaps:
+                            assigned_lane = lane_idx
+                            lanes[lane_idx].append((start_idx, end_idx))
+                            break
+
+                    if assigned_lane is None:
+                        assigned_lane = 0
+
+                    # Calculate position
+                    block_x1 = time_x + 100 + (assigned_lane * block_width)
+                    block_y1 = content_start_y + (start_idx * slot_height) + 2
+                    block_x2 = block_x1 + block_width - 4
+                    block_y2 = content_start_y + (end_idx * slot_height) - 2
+
+                    # Get color
+                    color = self.person_colors.get(person_name, accent)
+
+                    # Draw block
+                    draw.rectangle([block_x1, block_y1, block_x2, block_y2],
+                                  fill=color, outline=border, width=2)
+
+                    # Draw name
+                    display_name = self.get_display_name(person_name)
+                    if is_short:
+                        display_name += " ⚠"
+
+                    # Center text in block
+                    text_bbox = draw.textbbox((0, 0), display_name, font=small_font)
+                    text_width = text_bbox[2] - text_bbox[0]
+                    text_height = text_bbox[3] - text_bbox[1]
+                    text_x = block_x1 + (block_x2 - block_x1 - text_width) // 2
+                    text_y = block_y1 + (block_y2 - block_y1 - text_height) // 2
+
+                    draw.text((text_x, text_y), display_name, fill=bg_dark, font=small_font)
+
+        # Hours section (right side)
+        hours_x = 720
+        hours_y = 70
+        hours_width = 650
+
+        # Draw hours border
+        draw.rectangle([hours_x, hours_y, hours_x + hours_width, schedule_y + day_height * 2 + 20],
+                      outline=border, width=2)
+
+        # Draw title
+        draw.text((hours_x + 20, hours_y + 15), "Hours Tracker",
+                 fill=accent, font=header_font)
+
+        # Draw headers
+        header_y = hours_y + 50
+        headers = ["Name", "Scheduled", "Preferred", "Agreed", "Max"]
+        header_x_positions = [hours_x + 20, hours_x + 220, hours_x + 350, hours_x + 450, hours_x + 550]
+
+        for i, header in enumerate(headers):
+            draw.text((header_x_positions[i], header_y), header,
+                     fill=accent, font=normal_font)
+
+        # Draw separator line
+        draw.line([hours_x + 20, header_y + 25, hours_x + hours_width - 20, header_y + 25],
+                 fill=border, width=2)
+
+        # Draw people data
+        sorted_people = sorted(self.people, key=lambda p: p['name'])
+        row_height = 25
+        data_y = header_y + 35
+
+        for idx, person in enumerate(sorted_people):
+            y = data_y + (idx * row_height)
+            name = person['name']
+            scheduled = self.hours_scheduled[name]
+            preferred = person['preferred_hours']
+            agreed = person['agreed_hours']
+            max_hours = person['max_hours']
+
+            # Color code based on hours
+            if scheduled < agreed:
+                sched_color = error
+            elif scheduled < preferred:
+                sched_color = warning_color
+            else:
+                sched_color = success
+
+            # Draw person color indicator
+            person_color = self.person_colors.get(name, accent)
+            draw.rectangle([hours_x + 10, y, hours_x + 15, y + 15],
+                          fill=person_color)
+
+            # Draw data
+            draw.text((header_x_positions[0], y), name, fill=text_primary, font=small_font)
+            draw.text((header_x_positions[1], y), f"{scheduled:.1f}h", fill=sched_color, font=small_font)
+            draw.text((header_x_positions[2], y), f"{preferred}h", fill=text_muted, font=small_font)
+            draw.text((header_x_positions[3], y), f"{agreed}h", fill=text_muted, font=small_font)
+            draw.text((header_x_positions[4], y), f"{max_hours}h", fill=text_muted, font=small_font)
+
+        # Save image
+        img.save(file_path, 'PNG')
+
 
     def load_csv(self):
         file_path = filedialog.askopenfilename(
