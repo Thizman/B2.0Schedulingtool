@@ -4,22 +4,42 @@ from tkinter import ttk, filedialog, messagebox
 from datetime import datetime, timedelta
 from collections import defaultdict
 import copy
+import random
 
 class SchedulingTool:
     def __init__(self, root):
         self.root = root
         self.root.title("B2.0 Scheduling Tool")
-        self.root.geometry("1400x900")
+        self.root.geometry("1600x900")
+
+        # Claude-inspired color scheme
+        self.colors = {
+            'bg_dark': '#1a1a1a',
+            'bg_medium': '#2a2a2a',
+            'bg_light': '#3a3a3a',
+            'accent': '#d4734b',
+            'accent_hover': '#e38a61',
+            'text_primary': '#e8e8e8',
+            'text_secondary': '#b8b8b8',
+            'text_muted': '#808080',
+            'success': '#5eb56e',
+            'warning': '#d4734b',
+            'error': '#d44747',
+            'border': '#4a4a4a'
+        }
+
+        # Configure root window
+        self.root.configure(bg=self.colors['bg_dark'])
 
         # Data structures
         self.people = []  # List of person dictionaries
-        self.schedule = {}  # {day: {timeslot: [person_names]}}
+        self.schedule = {}  # {day: {person_name: {'start': slot_idx, 'end': slot_idx, 'hours': float}}}
         self.hours_scheduled = {}  # {person_name: hours}
+        self.person_colors = {}  # {person_name: color}
 
         # Timeslots (actual working hours 10:00-16:30)
         self.timeslots = [
-            "10:00-11:00", "11:00-12:00", "12:00-13:00",
-            "13:00-14:00", "14:00-15:00", "15:00-16:00", "16:00-16:30"
+            "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "16:30"
         ]
         self.timeslot_codes = ["1011", "1112", "1213", "1314", "1415", "1516", "1617"]
         self.days = ["M", "TU", "W", "TH"]
@@ -31,7 +51,58 @@ class SchedulingTool:
         self.desks_available = tk.StringVar(value="2")
         self.min_shift_length = tk.StringVar(value="3")
 
+        self.setup_styles()
         self.setup_ui()
+
+    def setup_styles(self):
+        """Setup ttk styles with Claude-inspired theme"""
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        # Configure colors
+        style.configure('.',
+                       background=self.colors['bg_dark'],
+                       foreground=self.colors['text_primary'],
+                       bordercolor=self.colors['border'],
+                       fieldbackground=self.colors['bg_medium'])
+
+        style.configure('TFrame', background=self.colors['bg_dark'])
+        style.configure('TLabel', background=self.colors['bg_dark'],
+                       foreground=self.colors['text_primary'])
+        style.configure('TButton', background=self.colors['bg_light'],
+                       foreground=self.colors['text_primary'],
+                       bordercolor=self.colors['border'],
+                       focuscolor=self.colors['accent'])
+        style.map('TButton',
+                 background=[('active', self.colors['accent'])],
+                 foreground=[('active', self.colors['text_primary'])])
+
+        style.configure('Accent.TButton',
+                       background=self.colors['accent'],
+                       foreground=self.colors['text_primary'])
+        style.map('Accent.TButton',
+                 background=[('active', self.colors['accent_hover'])])
+
+        style.configure('TEntry',
+                       fieldbackground=self.colors['bg_light'],
+                       foreground=self.colors['text_primary'],
+                       bordercolor=self.colors['border'],
+                       insertcolor=self.colors['text_primary'])
+
+        style.configure('TLabelframe', background=self.colors['bg_dark'],
+                       foreground=self.colors['text_primary'],
+                       bordercolor=self.colors['border'])
+        style.configure('TLabelframe.Label', background=self.colors['bg_dark'],
+                       foreground=self.colors['accent'])
+
+        style.configure('TNotebook', background=self.colors['bg_dark'],
+                       bordercolor=self.colors['border'])
+        style.configure('TNotebook.Tab',
+                       background=self.colors['bg_medium'],
+                       foreground=self.colors['text_secondary'])
+        style.map('TNotebook.Tab',
+                 background=[('selected', self.colors['bg_light'])],
+                 foreground=[('selected', self.colors['accent'])])
 
     def setup_ui(self):
         # Main container
@@ -211,6 +282,20 @@ class SchedulingTool:
 
         messagebox.showinfo("Success", f"Loaded {len(self.people)} people from CSV")
 
+    def generate_person_colors(self):
+        """Generate distinct colors for each person"""
+        # Predefined color palette (warm tones to match Claude theme)
+        palette = [
+            '#d4734b', '#e38a61', '#c95d3a', '#b85a3d',
+            '#8b7355', '#a68a6d', '#7d9e7f', '#6b8e7d',
+            '#7a8fa3', '#8b9eb8', '#a37d9e', '#b88ba3'
+        ]
+
+        random.shuffle(palette)
+
+        for i, person in enumerate(self.people):
+            self.person_colors[person['name']] = palette[i % len(palette)]
+
     def generate_schedule(self):
         if not self.people:
             messagebox.showerror("Error", "Please load a CSV file first")
@@ -223,16 +308,56 @@ class SchedulingTool:
             messagebox.showerror("Error", "Please enter valid numbers for desks and min shift length")
             return
 
-        # Initialize schedule and hours
-        self.schedule = {day: {slot: [] for slot in self.timeslots} for day in self.day_names}
+        # Generate colors for people
+        self.generate_person_colors()
+
+        # Initialize schedule and hours (new structure: person-centric)
+        self.schedule = {day: {} for day in self.day_names}
         self.hours_scheduled = {person['name']: 0 for person in self.people}
+
+        # For algorithm: track old style (slot: [people])
+        self.temp_schedule = {day: {i: [] for i in range(len(self.timeslots) - 1)} for day in self.day_names}
 
         # Run scheduling algorithm
         self.run_scheduling_algorithm(desks, min_shift)
 
+        # Convert temp_schedule to person-centric schedule
+        self.convert_to_person_schedule(min_shift)
+
         # Display results
         self.display_schedule()
         self.display_hours()
+
+    def convert_to_person_schedule(self, min_shift):
+        """Convert slot-based schedule to person-based blocks"""
+        for day in self.day_names:
+            person_shifts = {}
+
+            # Find continuous blocks for each person
+            for person in self.people:
+                person_name = person['name']
+                person_slots = []
+
+                # Find all slots this person is scheduled
+                for slot_idx in range(len(self.timeslots) - 1):
+                    if person_name in self.temp_schedule[day][slot_idx]:
+                        person_slots.append(slot_idx)
+
+                # If person has slots, create a block
+                if person_slots:
+                    start = min(person_slots)
+                    end = max(person_slots) + 1
+                    hours = sum(0.5 if i == 6 else 1 for i in person_slots)
+                    is_short = hours < min_shift
+
+                    person_shifts[person_name] = {
+                        'start': start,
+                        'end': end,
+                        'hours': hours,
+                        'is_short': is_short
+                    }
+
+            self.schedule[day] = person_shifts
 
     def run_scheduling_algorithm(self, desks, min_shift):
         """
@@ -245,7 +370,7 @@ class SchedulingTool:
         """
 
         # Track how many people are in each timeslot (for equal distribution)
-        timeslot_counts = {day: {slot: 0 for slot in self.timeslots} for day in self.day_names}
+        timeslot_counts = {day: {i: 0 for i in range(len(self.timeslots) - 1)} for day in self.day_names}
 
         # Track people who haven't been scheduled yet
         unscheduled_people = set(person['name'] for person in self.people)
@@ -325,20 +450,20 @@ class SchedulingTool:
                         continue
 
                     # Check if all slots have room
-                    if not all(len(self.schedule[day][self.timeslots[idx]]) < desks for idx in shift_slots):
+                    if not all(len(self.temp_schedule[day][idx]) < desks for idx in shift_slots):
                         continue
 
                     # Check if person is already scheduled this day
                     already_scheduled = any(
-                        person['name'] in self.schedule[day][self.timeslots[idx]]
-                        for idx in range(len(self.timeslots))
+                        person['name'] in self.temp_schedule[day][idx]
+                        for idx in range(len(self.timeslots) - 1)
                     )
                     if already_scheduled:
                         continue
 
                     # Calculate score (lower is better)
                     # Prioritize equal distribution
-                    total_in_slots = sum(timeslot_counts[day][self.timeslots[idx]] for idx in shift_slots)
+                    total_in_slots = sum(timeslot_counts[day][idx] for idx in shift_slots)
                     avg_in_slots = total_in_slots / len(shift_slots)
 
                     # Calculate shift duration (0.5 for last slot, 1 for others)
@@ -362,9 +487,8 @@ class SchedulingTool:
         day = shift['day']
 
         for slot_idx in shift['slots']:
-            slot = self.timeslots[slot_idx]
-            self.schedule[day][slot].append(person['name'])
-            timeslot_counts[day][slot] += 1
+            self.temp_schedule[day][slot_idx].append(person['name'])
+            timeslot_counts[day][slot_idx] += 1
 
         self.hours_scheduled[person['name']] += shift['hours']
         person_shifts[person['name']].append(shift)
@@ -374,8 +498,8 @@ class SchedulingTool:
         for day in self.day_names:
             day_code = self.days[self.day_names.index(day)]
 
-            for slot_idx, slot in enumerate(self.timeslots):
-                while len(self.schedule[day][slot]) < desks:
+            for slot_idx in range(len(self.timeslots) - 1):
+                while len(self.temp_schedule[day][slot_idx]) < desks:
                     # Find someone available for this specific slot
                     assigned = False
 
@@ -384,22 +508,23 @@ class SchedulingTool:
 
                         # Check if already scheduled this day
                         already_scheduled = any(
-                            person['name'] in self.schedule[day][s]
-                            for s in self.timeslots
+                            person['name'] in self.temp_schedule[day][i]
+                            for i in range(len(self.timeslots) - 1)
                         )
                         if already_scheduled:
                             continue
 
                         # Check availability
+                        slot = self.timeslots[slot_idx] + "-" + self.timeslots[slot_idx + 1]
                         if person['availability'].get(day_code, {}).get('whole_day', False) or \
                            person['availability'].get(day_code, {}).get(slot, False):
 
                             # Check if under max hours
                             slot_hours = 0.5 if slot_idx == 6 else 1
                             if self.hours_scheduled[person['name']] + slot_hours <= person['max_hours']:
-                                self.schedule[day][slot].append(f"{person['name']} [SHORT]")
+                                self.temp_schedule[day][slot_idx].append(person['name'])
                                 self.hours_scheduled[person['name']] += slot_hours
-                                timeslot_counts[day][slot] += 1
+                                timeslot_counts[day][slot_idx] += 1
                                 assigned = True
                                 break
 
@@ -412,59 +537,151 @@ class SchedulingTool:
             widget.destroy()
 
         desks = int(self.desks_available.get())
+        min_shift = int(self.min_shift_length.get())
 
-        # Create schedule grid
+        # Create main grid
+        grid_frame = tk.Frame(self.schedule_frame, bg=self.colors['bg_dark'])
+        grid_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Time labels column
+        time_col = tk.Frame(grid_frame, bg=self.colors['bg_dark'], width=80)
+        time_col.grid(row=1, column=0, sticky=(tk.N, tk.S))
+
+        # Add time labels
+        for i, time in enumerate(self.timeslots[:-1]):  # Exclude 16:30 from labels
+            time_label = tk.Label(time_col, text=time,
+                                font=("Consolas", 10),
+                                fg=self.colors['text_muted'],
+                                bg=self.colors['bg_dark'],
+                                anchor=tk.E,
+                                padx=10)
+            time_label.grid(row=i, column=0, sticky=tk.E, pady=(0, 40))
+
+        # Create columns for each day
         for day_idx, day in enumerate(self.day_names):
             # Day header
-            day_label = ttk.Label(self.schedule_frame, text=day,
-                                 font=("Arial", 12, "bold"))
-            day_label.grid(row=0, column=day_idx, padx=10, pady=5, sticky=tk.W)
+            day_header = tk.Frame(grid_frame, bg=self.colors['bg_medium'],
+                                height=50, width=300)
+            day_header.grid(row=0, column=day_idx + 1, sticky=(tk.W, tk.E),
+                          padx=5, pady=(0, 10))
+            day_header.grid_propagate(False)
 
-            # Timeslots
-            for slot_idx, slot in enumerate(self.timeslots):
-                scheduled = self.schedule[day][slot]
+            day_label = tk.Label(day_header, text=day,
+                                font=("Consolas", 14, "bold"),
+                                fg=self.colors['text_primary'],
+                                bg=self.colors['bg_medium'])
+            day_label.pack(expand=True)
 
-                # Create frame for this timeslot
-                slot_frame = tk.Frame(self.schedule_frame, relief=tk.RIDGE, borderwidth=2)
-                slot_frame.grid(row=slot_idx + 1, column=day_idx, padx=5, pady=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+            # Create canvas for this day's schedule
+            day_canvas = tk.Canvas(grid_frame,
+                                  width=300,
+                                  height=500,
+                                  bg=self.colors['bg_medium'],
+                                  highlightthickness=1,
+                                  highlightbackground=self.colors['border'])
+            day_canvas.grid(row=1, column=day_idx + 1, sticky=(tk.N, tk.S),
+                          padx=5)
 
-                # Timeslot label
-                tk.Label(slot_frame, text=slot, font=("Arial", 9, "bold")).pack(anchor=tk.W)
+            # Draw time grid lines
+            for i in range(len(self.timeslots)):
+                y = i * 60
+                day_canvas.create_line(0, y, 300, y,
+                                      fill=self.colors['border'],
+                                      width=1)
 
-                # Check if unfilled
-                if len(scheduled) < desks:
-                    slot_frame.config(bg="#ffcccc")  # Light red for unfilled
-                    tk.Label(slot_frame, text=f"⚠ {len(scheduled)}/{desks} filled",
-                            fg="red", bg="#ffcccc").pack(anchor=tk.W)
-                else:
-                    slot_frame.config(bg="#ccffcc")  # Light green for filled
+            # Get people scheduled for this day
+            if day in self.schedule:
+                # Count people per timeslot for capacity tracking
+                slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
 
-                # List scheduled people
-                for person_name in scheduled:
-                    if "[SHORT]" in person_name:
-                        tk.Label(slot_frame, text=person_name, fg="orange",
-                                bg=slot_frame.cget("bg")).pack(anchor=tk.W)
-                    else:
-                        tk.Label(slot_frame, text=person_name,
-                                bg=slot_frame.cget("bg")).pack(anchor=tk.W)
+                # Draw blocks for each person
+                x_offset = 5
+                block_width = (300 - 10) // desks  # Divide width by number of desks
+
+                # Group by start time for positioning
+                people_shifts = list(self.schedule[day].items())
+                people_shifts.sort(key=lambda x: x[1]['start'])
+
+                # Track which "lane" each person should be in
+                lanes_used = {}  # {start_slot: lane_number}
+
+                for person_name, shift in people_shifts:
+                    start_idx = shift['start']
+                    end_idx = shift['end']
+                    hours = shift['hours']
+                    is_short = shift.get('is_short', False)
+
+                    # Find which lane to put this person in
+                    lane = 0
+                    for i in range(start_idx, end_idx):
+                        if i in slot_counts:
+                            lane = max(lane, slot_counts[i])
+                            slot_counts[i] += 1
+
+                    # Calculate position
+                    y1 = start_idx * 60 + 5
+                    y2 = end_idx * 60 - 5
+                    x1 = x_offset + (lane * block_width)
+                    x2 = x1 + block_width - 5
+
+                    # Get color for this person
+                    color = self.person_colors.get(person_name, self.colors['accent'])
+
+                    # Draw block
+                    block = day_canvas.create_rectangle(x1, y1, x2, y2,
+                                                       fill=color,
+                                                       outline=self.colors['border'],
+                                                       width=2)
+
+                    # Add name label
+                    name_text = person_name
+                    if is_short:
+                        name_text += " ⚠"
+
+                    text_y = (y1 + y2) / 2
+                    name_label = day_canvas.create_text((x1 + x2) / 2, text_y,
+                                                       text=name_text,
+                                                       fill=self.colors['bg_dark'],
+                                                       font=("Consolas", 9, "bold"),
+                                                       width=block_width - 10)
+
+                # Check for unfilled slots
+                for i in range(len(self.timeslots) - 1):
+                    if slot_counts[i] < desks:
+                        # Draw warning indicator
+                        y = i * 60 + 30
+                        day_canvas.create_text(150, y,
+                                             text=f"⚠ {slot_counts[i]}/{desks}",
+                                             fill=self.colors['error'],
+                                             font=("Consolas", 9))
 
     def display_hours(self):
         # Clear previous display
         for widget in self.hours_frame.winfo_children():
             widget.destroy()
 
+        # Create styled container
+        container = tk.Frame(self.hours_frame, bg=self.colors['bg_dark'])
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
         # Create headers
         headers = ["Name", "Scheduled", "Preferred", "Agreed", "Max"]
         for col, header in enumerate(headers):
-            ttk.Label(self.hours_frame, text=header, font=("Arial", 10, "bold")).grid(
-                row=0, column=col, padx=10, pady=5, sticky=tk.W
-            )
+            header_label = tk.Label(container, text=header,
+                                   font=("Consolas", 11, "bold"),
+                                   fg=self.colors['accent'],
+                                   bg=self.colors['bg_dark'])
+            header_label.grid(row=0, column=col, padx=15, pady=10, sticky=tk.W)
+
+        # Add separator
+        separator = tk.Frame(container, height=2, bg=self.colors['border'])
+        separator.grid(row=1, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(0, 10))
 
         # Sort people by name
         sorted_people = sorted(self.people, key=lambda p: p['name'])
 
         # Display each person's hours
-        for row, person in enumerate(sorted_people, start=1):
+        for row, person in enumerate(sorted_people, start=2):
             name = person['name']
             scheduled = self.hours_scheduled[name]
             preferred = person['preferred_hours']
@@ -473,19 +690,40 @@ class SchedulingTool:
 
             # Color code based on hours
             if scheduled < agreed:
-                color = "red"
+                color = self.colors['error']
             elif scheduled < preferred:
-                color = "orange"
+                color = self.colors['warning']
             else:
-                color = "green"
+                color = self.colors['success']
 
-            ttk.Label(self.hours_frame, text=name).grid(row=row, column=0, padx=10, pady=2, sticky=tk.W)
-            ttk.Label(self.hours_frame, text=f"{scheduled:.1f}h", foreground=color).grid(
-                row=row, column=1, padx=10, pady=2, sticky=tk.W
-            )
-            ttk.Label(self.hours_frame, text=f"{preferred}h").grid(row=row, column=2, padx=10, pady=2, sticky=tk.W)
-            ttk.Label(self.hours_frame, text=f"{agreed}h").grid(row=row, column=3, padx=10, pady=2, sticky=tk.W)
-            ttk.Label(self.hours_frame, text=f"{max_hours}h").grid(row=row, column=4, padx=10, pady=2, sticky=tk.W)
+            # Get person's color for visual consistency
+            person_color = self.person_colors.get(name, self.colors['accent'])
+
+            # Color indicator
+            color_box = tk.Frame(container, width=4, height=20, bg=person_color)
+            color_box.grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+
+            # Name
+            name_label = tk.Label(container, text=name,
+                                 font=("Consolas", 10),
+                                 fg=self.colors['text_primary'],
+                                 bg=self.colors['bg_dark'])
+            name_label.grid(row=row, column=0, padx=(10, 15), pady=4, sticky=tk.W)
+
+            # Scheduled hours (colored)
+            scheduled_label = tk.Label(container, text=f"{scheduled:.1f}h",
+                                      font=("Consolas", 10, "bold"),
+                                      fg=color,
+                                      bg=self.colors['bg_dark'])
+            scheduled_label.grid(row=row, column=1, padx=15, pady=4, sticky=tk.W)
+
+            # Other hours
+            for col, hours in enumerate([preferred, agreed, max_hours], start=2):
+                label = tk.Label(container, text=f"{hours}h",
+                               font=("Consolas", 10),
+                               fg=self.colors['text_secondary'],
+                               bg=self.colors['bg_dark'])
+                label.grid(row=row, column=col, padx=15, pady=4, sticky=tk.W)
 
 
 def main():
