@@ -8,6 +8,37 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 import io
 
+class ToolTip:
+    """Create a tooltip for a given widget"""
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip_window = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event=None):
+        if self.tooltip_window or not self.text:
+            return
+        x, y, _, _ = self.widget.bbox("insert") if hasattr(self.widget, 'bbox') else (0, 0, 0, 0)
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        self.tooltip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+
+        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                        background="#2a2a2a", foreground="#e8e8e8",
+                        relief=tk.SOLID, borderwidth=1,
+                        font=("Consolas", 9), padx=8, pady=6)
+        label.pack()
+
+    def hide_tooltip(self, event=None):
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
+
 class SchedulingTool:
     def __init__(self, root):
         self.root = root
@@ -601,17 +632,19 @@ class SchedulingTool:
             if person['name'] not in unscheduled_people:
                 continue
 
-            best_shift = self.find_best_shift(person, desks, min_shift, timeslot_counts, person_shifts)
+            best_shift = self.find_best_shift(person, desks_per_day, min_shift, timeslot_counts, person_shifts)
 
             if best_shift:
                 self.assign_shift(person, best_shift, timeslot_counts, person_shifts)
                 unscheduled_people.remove(person['name'])
 
         # Phase 2: Fill remaining slots, prioritizing equal distribution and preferred hours
+        # Continue until target hours reached or no more assignments possible
         max_iterations = 100
         iteration = 0
+        total_hours_scheduled = sum(self.hours_scheduled.values())
 
-        while iteration < max_iterations:
+        while iteration < max_iterations and total_hours_scheduled < total_hours_target:
             iteration += 1
             assigned_something = False
 
@@ -627,25 +660,32 @@ class SchedulingTool:
                     continue
 
                 # Find the best available shift
-                best_shift = self.find_best_shift(person, desks, min_shift, timeslot_counts, person_shifts)
+                best_shift = self.find_best_shift(person, desks_per_day, min_shift, timeslot_counts, person_shifts)
 
                 if best_shift:
                     self.assign_shift(person, best_shift, timeslot_counts, person_shifts)
                     assigned_something = True
+                    total_hours_scheduled = sum(self.hours_scheduled.values())
+
+                    # Check if target reached
+                    if total_hours_scheduled >= total_hours_target:
+                        break
 
             if not assigned_something:
                 break
 
-        # Phase 3: Try to fill empty slots with short shifts if necessary
-        self.fill_remaining_with_short_shifts(desks, min_shift, timeslot_counts)
+        # Phase 3: Try to fill empty slots with short shifts if necessary (only if under target)
+        if total_hours_scheduled < total_hours_target:
+            self.fill_remaining_with_short_shifts(desks_per_day, min_shift, timeslot_counts, total_hours_target)
 
-    def find_best_shift(self, person, desks, min_shift, timeslot_counts, person_shifts):
+    def find_best_shift(self, person, desks_per_day, min_shift, timeslot_counts, person_shifts):
         """Find the best shift for a person based on availability and current distribution"""
         best_shift = None
         best_score = float('inf')
 
         for day_idx, day in enumerate(self.day_names):
             day_code = self.days[day_idx]
+            desks = desks_per_day[day]  # Get desk count for this specific day
 
             # Check whole day availability first
             if person['availability'].get(day_code, {}).get('whole_day', False):
@@ -718,12 +758,18 @@ class SchedulingTool:
         self.hours_scheduled[person['name']] += shift['hours']
         person_shifts[person['name']].append(shift)
 
-    def fill_remaining_with_short_shifts(self, desks, min_shift, timeslot_counts):
+    def fill_remaining_with_short_shifts(self, desks_per_day, min_shift, timeslot_counts, total_hours_target):
         """Try to fill empty slots with short shifts as last resort"""
         for day in self.day_names:
             day_code = self.days[self.day_names.index(day)]
+            desks = desks_per_day[day]  # Get desk count for this specific day
 
             for slot_idx in range(len(self.timeslots) - 1):
+                # Check if we've reached the target
+                total_hours_scheduled = sum(self.hours_scheduled.values())
+                if total_hours_scheduled >= total_hours_target:
+                    return
+
                 while len(self.temp_schedule[day][slot_idx]) < desks:
                     # Find someone available for this specific slot
                     assigned = False
@@ -761,7 +807,6 @@ class SchedulingTool:
         for widget in self.schedule_frame.winfo_children():
             widget.destroy()
 
-        desks = int(self.desks_available.get())
         min_shift = int(self.min_shift_length.get())
 
         # Main container
@@ -791,6 +836,7 @@ class SchedulingTool:
 
         for day_idx, day in enumerate(self.day_names):
             row, col = grid_positions[day_idx]
+            desks = self.desks_per_day[day]  # Get desk count for this specific day
             self.create_day_block(days_grid, day, day_idx, desks, min_shift, row, col)
 
     def create_day_block(self, parent, day, day_idx, desks, min_shift, row, col):
@@ -865,6 +911,8 @@ class SchedulingTool:
                                         fg=self.colors['error'],
                                         bg=self.colors['bg_dark'])
                 warning_label.grid(row=i, column=0, pady=(0, SLOT_HEIGHT-12))
+                # Add tooltip explaining the warning
+                ToolTip(warning_label, f"Understaffed: Only {slot_counts[i]} of {desks} desks filled")
 
         # Update canvas when it's sized
         def draw_schedule(event=None):
@@ -931,16 +979,39 @@ class SchedulingTool:
                     self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
                                           fill=color, outline=self.colors['border'], width=2)
 
-                    # Add name
+                    # Add name with adaptive font size to ensure it fits
                     display_name = self.get_display_name(person_name)
                     if is_short:
                         display_name += " ⚠"
 
+                    # Calculate available width
+                    available_width = x2 - x1 - 10  # 5px padding on each side
                     text_y = (y1 + y2) / 2
+
+                    # Try different font sizes to fit the text
+                    font_size = 10
+                    font = ("Consolas", font_size, "bold")
+
+                    # Estimate text width (rough approximation: 0.6 * font_size per character)
+                    estimated_width = len(display_name) * (font_size * 0.6)
+
+                    # Reduce font size if text is too wide
+                    while estimated_width > available_width and font_size > 6:
+                        font_size -= 1
+                        font = ("Consolas", font_size, "bold")
+                        estimated_width = len(display_name) * (font_size * 0.6)
+
+                    # If still too wide, truncate with ellipsis
+                    final_name = display_name
+                    if estimated_width > available_width:
+                        max_chars = int(available_width / (font_size * 0.6)) - 3
+                        if max_chars > 0:
+                            final_name = display_name[:max_chars] + "..."
+
                     day_canvas.create_text((x1 + x2) / 2, text_y,
-                                          text=display_name,
+                                          text=final_name,
                                           fill=self.colors['bg_dark'],
-                                          font=("Consolas", 10, "bold"))
+                                          font=font)
 
         day_canvas.bind('<Configure>', draw_schedule)
         day_canvas.after(100, draw_schedule)
