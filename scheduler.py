@@ -1400,7 +1400,7 @@ class SchedulingTool:
 
         # Total hours value (in accent color)
         total_value = tk.Label(container, text=f"{total_scheduled:.1f}h",
-                              font=("Consolas", 12, "bold"),
+                              font=("Consolas", 10, "bold"),
                               fg=self.colors['accent_hover'],
                               bg=self.colors['bg_dark'])
         total_value.grid(row=total_row, column=1, padx=15, pady=8, sticky=tk.W)
