@@ -499,9 +499,9 @@ class SchedulingTool:
 
     def create_export_image(self, file_path, week_text):
         """Create a professional PNG export of schedule and hours"""
-        # Image dimensions
-        img_width = 1200
-        img_height = 1000
+        # Image dimensions (increased to accommodate wider day blocks)
+        img_width = 1600
+        img_height = 1100
 
         # Create image with dark background
         img = Image.new('RGB', (img_width, img_height), color='#2a2a2a')
@@ -537,8 +537,8 @@ class SchedulingTool:
         # Schedule section (left side)
         schedule_x = 30
         schedule_y = 70
-        day_width = 330
-        day_height = 400
+        day_width = 480  # Increased to accommodate 8 desks comfortably
+        day_height = 420
 
         # Draw 2x2 grid of days
         positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
@@ -677,9 +677,9 @@ class SchedulingTool:
                     draw.text((text_x, text_y), display_name, fill=bg_dark, font=current_font)
 
         # Hours section (right side)
-        hours_x = 720
+        hours_x = 1040  # Moved right to accommodate wider schedule
         hours_y = 70
-        hours_width = 400
+        hours_width = 520
 
         # Draw hours border
         draw.rectangle([hours_x, hours_y, hours_x + hours_width, schedule_y + day_height * 2 + 20],
@@ -692,7 +692,7 @@ class SchedulingTool:
         # Draw headers (only Name and Scheduled)
         header_y = hours_y + 50
         headers = ["Name", "Scheduled"]
-        header_x_positions = [hours_x + 20, hours_x + 250]
+        header_x_positions = [hours_x + 20, hours_x + 350]
 
         for i, header in enumerate(headers):
             draw.text((header_x_positions[i], header_y), header,
