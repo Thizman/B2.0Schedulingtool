@@ -1349,9 +1349,14 @@ class SchedulingTool:
         for i in range(len(self.timeslots) - 1):
             if slot_counts[i] < desks:
                 y_pos = i * SLOT_HEIGHT + 5  # Position at top of each slot with small offset
+
+                # Choose color based on how many desks are filled
+                # Orange if at least 2 desks filled, red if less than 2
+                warning_color = self.colors['warning'] if slot_counts[i] >= 2 else self.colors['error']
+
                 warning_canvas.create_text(5, y_pos, text=f"⚠ {slot_counts[i]}/{desks}",
                                          font=("Consolas", 8),
-                                         fill=self.colors['error'],
+                                         fill=warning_color,
                                          anchor=tk.W)
 
         # Update canvas when it's sized
