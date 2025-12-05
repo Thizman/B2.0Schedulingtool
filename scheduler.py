@@ -896,73 +896,96 @@ class SchedulingTool:
     def run_scheduling_algorithm(self, desks_per_day, min_shift, total_hours_target):
         """
         New Priority-Based Scheduling Algorithm:
-        CRITICAL: REACH THE REQUIRED TOTAL HOURS AT ALL COSTS
-        1. Schedule shifts so total hours required are fulfilled (TOP PRIORITY)
-        2. Never schedule someone for over their max hours (HARD CONSTRAINT)
-        3. Schedule everyone that has nonzero preferred hours
-        4. Schedule everyone for their preferred hours
-        5. Preferably adhere to minimum shift length
-        6. When stuck, can schedule up to agreed hours (if agreed > preferred)
-        7. When still stuck, can schedule up to max hours
+        HARD CONSTRAINTS:
+        1. Never exceed desk capacity per timeslot (ABSOLUTE HARD LIMIT)
+        2. Never schedule someone for over their max hours (ABSOLUTE HARD LIMIT)
+
+        PRIORITIES:
+        1. Schedule everyone with nonzero preferred hours
+        2. Get everyone to their preferred hours (can exceed total target for this)
+        3. Try to meet or exceed total hours target
+        4. Preferably adhere to minimum shift length
+        5. When needed, use agreed hours (if agreed > preferred)
+        6. Last resort: use max hours
         """
 
         # Track timeslot filling for balance
         timeslot_counts = {day: {i: 0 for i in range(len(self.timeslots) - 1)} for day in self.day_names}
 
-        # Get people with nonzero preferred hours (Priority #3)
+        # Get people with nonzero preferred hours
         people_to_schedule = [p for p in self.people if p['preferred_hours'] > 0]
 
-        # Phase 1: Give everyone at least one shift (Priority #3)
+        # Phase 1: Give everyone at least one shift
         for person in people_to_schedule:
             if self.hours_scheduled[person['name']] == 0:
                 shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'initial')
                 if shift:
                     self.assign_shift_to_person(person, shift, timeslot_counts)
 
-        # Phase 2: Fill everyone to their preferred hours (Priority #4)
-        for person in people_to_schedule:
-            while self.hours_scheduled[person['name']] < person['preferred_hours']:
-                shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'preferred')
-                if shift:
-                    self.assign_shift_to_person(person, shift, timeslot_counts)
-                else:
-                    break  # Can't find more shifts for this person
-
-        # Phase 3: AGGRESSIVELY reach target hours (Priority #1 - AT ALL COSTS)
-        total_scheduled = sum(self.hours_scheduled.values())
-        max_iterations = 100  # Prevent infinite loops
+        # Phase 2: AGGRESSIVELY fill everyone to their preferred hours
+        # Keep iterating until no one can get closer to preferred
+        max_iterations = 100
         iteration = 0
 
-        while total_scheduled < total_hours_target and iteration < max_iterations:
+        while iteration < max_iterations:
             iteration += 1
             progress_made = False
 
-            # Try agreed hours tier for all people who can take more
+            # Sort by distance from preferred hours (furthest first)
             for person in sorted(people_to_schedule,
-                               key=lambda p: p['agreed_hours'] - self.hours_scheduled[p['name']],
+                               key=lambda p: p['preferred_hours'] - self.hours_scheduled[p['name']],
                                reverse=True):
 
-                if total_scheduled >= total_hours_target:
-                    break
-
-                # Try to assign up to agreed hours
-                if self.hours_scheduled[person['name']] < person['agreed_hours']:
-                    shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'agreed')
+                # Try to get closer to preferred hours
+                if self.hours_scheduled[person['name']] < person['preferred_hours']:
+                    shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'preferred')
                     if shift:
                         self.assign_shift_to_person(person, shift, timeslot_counts)
-                        total_scheduled = sum(self.hours_scheduled.values())
                         progress_made = True
 
-            # If still under target and no progress with agreed hours, try max hours tier
-            if total_scheduled < total_hours_target:
+            # If no progress made, we can't get anyone closer to preferred
+            if not progress_made:
+                break
+
+        # Phase 3: If still under target, use agreed hours tier
+        total_scheduled = sum(self.hours_scheduled.values())
+
+        if total_scheduled < total_hours_target:
+            iteration = 0
+            while total_scheduled < total_hours_target and iteration < max_iterations:
+                iteration += 1
+                progress_made = False
+
+                # Try agreed hours tier for people below agreed
+                for person in sorted(people_to_schedule,
+                                   key=lambda p: p['agreed_hours'] - self.hours_scheduled[p['name']],
+                                   reverse=True):
+
+                    if self.hours_scheduled[person['name']] < person['agreed_hours']:
+                        shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'agreed')
+                        if shift:
+                            self.assign_shift_to_person(person, shift, timeslot_counts)
+                            total_scheduled = sum(self.hours_scheduled.values())
+                            progress_made = True
+
+                            # Check if we've reached target
+                            if total_scheduled >= total_hours_target:
+                                break
+
+                if not progress_made or total_scheduled >= total_hours_target:
+                    break
+
+        # Phase 4: If still under target, use max hours tier as last resort
+        if total_scheduled < total_hours_target:
+            iteration = 0
+            while total_scheduled < total_hours_target and iteration < max_iterations:
+                iteration += 1
+                progress_made = False
+
                 for person in sorted(people_to_schedule,
                                    key=lambda p: p['max_hours'] - self.hours_scheduled[p['name']],
                                    reverse=True):
 
-                    if total_scheduled >= total_hours_target:
-                        break
-
-                    # Try to assign up to max hours
                     if self.hours_scheduled[person['name']] < person['max_hours']:
                         shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'max')
                         if shift:
@@ -970,12 +993,13 @@ class SchedulingTool:
                             total_scheduled = sum(self.hours_scheduled.values())
                             progress_made = True
 
-            # If no progress was made in this iteration, we can't reach the target
-            if not progress_made:
-                break
+                            if total_scheduled >= total_hours_target:
+                                break
 
-        # Phase 4: Last resort - try to schedule ANYONE who can work, even if already at max on some days
-        # Allow people to work multiple days if needed to reach target
+                if not progress_made or total_scheduled >= total_hours_target:
+                    break
+
+        # Phase 5: Last resort - allow multiple shifts per day if needed for target
         if total_scheduled < total_hours_target:
             self.fill_remaining_gaps_aggressively(desks_per_day, min_shift, timeslot_counts, total_hours_target)
 
