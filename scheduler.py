@@ -45,6 +45,14 @@ class SchedulingTool:
         self.root.title("B2.0 Scheduling Tool")
         self.root.geometry("1600x900")
 
+        # Set window icon
+        try:
+            icon_path = "/home/user/B2.0Schedulingtool/scheduler_icon.png"
+            icon_image = tk.PhotoImage(file=icon_path)
+            self.root.iconphoto(True, icon_image)
+        except Exception as e:
+            print(f"Could not load icon: {e}")
+
         # Claude-inspired color scheme (adjusted hierarchy)
         self.colors = {
             'bg_dark': '#2a2a2a',      # Main background (day blocks)
