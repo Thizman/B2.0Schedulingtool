@@ -500,7 +500,7 @@ class SchedulingTool:
     def create_export_image(self, file_path, week_text):
         """Create a professional PNG export of schedule and hours"""
         # Image dimensions
-        img_width = 1400
+        img_width = 1200
         img_height = 1000
 
         # Create image with dark background
@@ -645,20 +645,20 @@ class SchedulingTool:
         # Hours section (right side)
         hours_x = 720
         hours_y = 70
-        hours_width = 650
+        hours_width = 400
 
         # Draw hours border
         draw.rectangle([hours_x, hours_y, hours_x + hours_width, schedule_y + day_height * 2 + 20],
                       outline=border, width=2)
 
         # Draw title
-        draw.text((hours_x + 20, hours_y + 15), "Hours Tracker",
+        draw.text((hours_x + 20, hours_y + 15), "Hours Scheduled",
                  fill=accent, font=header_font)
 
-        # Draw headers
+        # Draw headers (only Name and Scheduled)
         header_y = hours_y + 50
-        headers = ["Name", "Scheduled", "Preferred", "Agreed", "Max"]
-        header_x_positions = [hours_x + 20, hours_x + 220, hours_x + 350, hours_x + 450, hours_x + 550]
+        headers = ["Name", "Scheduled"]
+        header_x_positions = [hours_x + 20, hours_x + 250]
 
         for i, header in enumerate(headers):
             draw.text((header_x_positions[i], header_y), header,
@@ -677,29 +677,15 @@ class SchedulingTool:
             y = data_y + (idx * row_height)
             name = person['name']
             scheduled = self.hours_scheduled[name]
-            preferred = person['preferred_hours']
-            agreed = person['agreed_hours']
-            max_hours = person['max_hours']
-
-            # Color code based on hours
-            if scheduled < agreed:
-                sched_color = error
-            elif scheduled < preferred:
-                sched_color = warning_color
-            else:
-                sched_color = success
 
             # Draw person color indicator
             person_color = self.person_colors.get(name, accent)
             draw.rectangle([hours_x + 10, y, hours_x + 15, y + 15],
                           fill=person_color)
 
-            # Draw data
+            # Draw data (name and scheduled hours in neutral grey)
             draw.text((header_x_positions[0], y), name, fill=text_primary, font=small_font)
-            draw.text((header_x_positions[1], y), f"{scheduled:.1f}h", fill=sched_color, font=small_font)
-            draw.text((header_x_positions[2], y), f"{preferred}h", fill=text_muted, font=small_font)
-            draw.text((header_x_positions[3], y), f"{agreed}h", fill=text_muted, font=small_font)
-            draw.text((header_x_positions[4], y), f"{max_hours}h", fill=text_muted, font=small_font)
+            draw.text((header_x_positions[1], y), f"{scheduled:.1f}h", fill=text_muted, font=small_font)
 
         # Save image
         img.save(file_path, 'PNG')
