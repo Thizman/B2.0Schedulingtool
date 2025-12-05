@@ -1140,13 +1140,19 @@ class SchedulingTool:
                               highlightbackground=self.colors['border'])
         day_canvas.pack(fill=tk.BOTH, expand=True)
 
-        # Add time labels with matching spacing
+        # Add time labels with exact SLOT_HEIGHT spacing
         for i, time in enumerate(self.timeslots[:-1]):
-            tk.Label(time_col, text=time,
+            # Create a frame with fixed height to ensure exact alignment
+            label_frame = tk.Frame(time_col, bg=self.colors['bg_dark'], height=SLOT_HEIGHT)
+            label_frame.grid(row=i, column=0, sticky=(tk.N, tk.S, tk.E))
+            label_frame.grid_propagate(False)  # Prevent frame from shrinking
+
+            # Center label within the frame
+            tk.Label(label_frame, text=time,
                     font=("Consolas", 9),
                     fg=self.colors['text_muted'],
                     bg=self.colors['bg_dark'],
-                    anchor=tk.E).grid(row=i, column=0, sticky=tk.E, pady=(0, SLOT_HEIGHT-12))
+                    anchor=tk.E).pack(expand=True, side=tk.RIGHT, padx=(0, 5))
 
         # Count capacity and add warnings
         slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
@@ -1157,15 +1163,20 @@ class SchedulingTool:
                     if i in slot_counts:
                         slot_counts[i] += 1
 
-        # Add warning labels with matching spacing
+        # Add warning labels with exact SLOT_HEIGHT spacing
         for i in range(len(self.timeslots) - 1):
+            # Create a frame with fixed height for each warning slot to ensure exact alignment
+            warning_frame = tk.Frame(warning_col, bg=self.colors['bg_dark'], height=SLOT_HEIGHT)
+            warning_frame.grid(row=i, column=0, sticky=(tk.N, tk.S, tk.W))
+            warning_frame.grid_propagate(False)  # Prevent frame from shrinking
+
             if slot_counts[i] < desks:
-                warning_label = tk.Label(warning_col,
+                warning_label = tk.Label(warning_frame,
                                         text=f"⚠ {slot_counts[i]}/{desks}",
                                         font=("Consolas", 8),
                                         fg=self.colors['error'],
                                         bg=self.colors['bg_dark'])
-                warning_label.grid(row=i, column=0, pady=(0, SLOT_HEIGHT-12))
+                warning_label.pack(expand=True, side=tk.LEFT, padx=(5, 0))
                 # Add tooltip explaining the warning
                 ToolTip(warning_label, f"Understaffed: Only {slot_counts[i]} of {desks} desks filled")
 
