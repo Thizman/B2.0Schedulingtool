@@ -632,7 +632,7 @@ class SchedulingTool:
                     draw.rectangle([block_x1, block_y1, block_x2, block_y2],
                                   fill=color, outline=border, width=2)
 
-                    # Draw name and times (three lines)
+                    # Draw name and times (four lines: Name, start, -, end)
                     display_name = self.get_display_name(person_name)
                     if is_short:
                         display_name += " ⚠"
@@ -677,37 +677,39 @@ class SchedulingTool:
                                 display_name = display_name[:max_chars] + "..."
                             current_font = tiny_font
 
-                    # Calculate vertical positions for three lines
+                    # Calculate vertical positions for four lines (close together, at top)
                     center_x = block_x1 + (block_x2 - block_x1) // 2
 
-                    # Position lines to fit within block
-                    if block_height >= 60:
-                        # Enough space for all three lines with good spacing
-                        name_y = block_y1 + block_height * 0.25
-                        start_y = block_y1 + block_height * 0.5
-                        end_y = block_y1 + block_height * 0.75
-                    else:
-                        # Compact spacing for shorter blocks
-                        line_spacing = max(10, block_height // 4)
-                        name_y = block_y1 + line_spacing
-                        start_y = name_y + line_spacing
-                        end_y = start_y + line_spacing
+                    # Use tight spacing matching the display function
+                    # Font size is 9 for small_font, so line_spacing = 9 - 1 = 8
+                    line_spacing = 8  # Tight spacing to match display
+
+                    # Start from top of block with small padding
+                    start_y_pos = block_y1 + 8
+                    name_y = start_y_pos
+                    time1_y = name_y + line_spacing
+                    dash_y = time1_y + line_spacing
+                    time2_y = dash_y + line_spacing
 
                     # Draw name (centered)
                     name_bbox = draw.textbbox((0, 0), display_name, font=current_font)
                     name_width = name_bbox[2] - name_bbox[0]
                     draw.text((center_x - name_width // 2, name_y), display_name, fill=bg_dark, font=current_font)
 
-                    # Draw start time with dash (centered)
-                    start_text = start_time + " -"
-                    start_bbox = draw.textbbox((0, 0), start_text, font=time_font)
+                    # Draw start time (centered)
+                    start_bbox = draw.textbbox((0, 0), start_time, font=time_font)
                     start_width = start_bbox[2] - start_bbox[0]
-                    draw.text((center_x - start_width // 2, start_y), start_text, fill=bg_dark, font=time_font)
+                    draw.text((center_x - start_width // 2, time1_y), start_time, fill=bg_dark, font=time_font)
+
+                    # Draw dash (centered)
+                    dash_bbox = draw.textbbox((0, 0), "-", font=time_font)
+                    dash_width = dash_bbox[2] - dash_bbox[0]
+                    draw.text((center_x - dash_width // 2, dash_y), "-", fill=bg_dark, font=time_font)
 
                     # Draw end time (centered)
                     end_bbox = draw.textbbox((0, 0), end_time, font=time_font)
                     end_width = end_bbox[2] - end_bbox[0]
-                    draw.text((center_x - end_width // 2, end_y), end_time, fill=bg_dark, font=time_font)
+                    draw.text((center_x - end_width // 2, time2_y), end_time, fill=bg_dark, font=time_font)
 
         # Hours section (right side)
         hours_x = 1040  # Moved right to accommodate wider schedule
@@ -1266,7 +1268,7 @@ class SchedulingTool:
                     self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
                                           fill=color, outline=self.colors['border'], width=2)
 
-                    # Add name and times (three lines)
+                    # Add name and times (four lines: Name, start, -, end)
                     display_name = self.get_display_name(person_name)
                     if is_short:
                         display_name += " ⚠"
@@ -1284,8 +1286,8 @@ class SchedulingTool:
                     font = ("Consolas", font_size, "bold")
                     time_font = ("Consolas", font_size - 1)
 
-                    # Estimate text width for the longest line (usually the start time with dash)
-                    longest_text = max([display_name, start_time + " -", end_time], key=len)
+                    # Estimate text width for the longest line
+                    longest_text = max([display_name, start_time, end_time], key=len)
                     estimated_width = len(longest_text) * (font_size * 0.6)
 
                     # Reduce font size if text is too wide
@@ -1293,7 +1295,7 @@ class SchedulingTool:
                         font_size -= 1
                         font = ("Consolas", font_size, "bold")
                         time_font = ("Consolas", max(6, font_size - 1))
-                        longest_text = max([display_name, start_time + " -", end_time], key=len)
+                        longest_text = max([display_name, start_time, end_time], key=len)
                         estimated_width = len(longest_text) * (font_size * 0.6)
 
                     # If still too wide, truncate name with ellipsis
@@ -1303,21 +1305,16 @@ class SchedulingTool:
                         if max_chars > 0:
                             final_name = display_name[:max_chars] + "..."
 
-                    # Calculate vertical positions for three lines
+                    # Calculate vertical positions for four lines (close together, at top)
                     center_x = (x1 + x2) / 2
-                    line_spacing = min(font_size + 2, block_height / 4)
+                    line_spacing = font_size - 1  # Tight spacing
 
-                    # Position lines to fit within block
-                    if block_height >= 40:
-                        # Enough space for all three lines with spacing
-                        name_y = y1 + block_height * 0.3
-                        start_y = y1 + block_height * 0.55
-                        end_y = y1 + block_height * 0.8
-                    else:
-                        # Compact spacing for shorter blocks
-                        name_y = y1 + 10
-                        start_y = name_y + line_spacing
-                        end_y = start_y + line_spacing
+                    # Start from top of block with small padding
+                    start_y = y1 + 8
+                    name_y = start_y
+                    time1_y = name_y + line_spacing
+                    dash_y = time1_y + line_spacing
+                    time2_y = dash_y + line_spacing
 
                     # Draw name
                     day_canvas.create_text(center_x, name_y,
@@ -1325,14 +1322,20 @@ class SchedulingTool:
                                           fill=self.colors['bg_dark'],
                                           font=font)
 
-                    # Draw start time with dash
-                    day_canvas.create_text(center_x, start_y,
-                                          text=start_time + " -",
+                    # Draw start time
+                    day_canvas.create_text(center_x, time1_y,
+                                          text=start_time,
+                                          fill=self.colors['bg_dark'],
+                                          font=time_font)
+
+                    # Draw dash
+                    day_canvas.create_text(center_x, dash_y,
+                                          text="-",
                                           fill=self.colors['bg_dark'],
                                           font=time_font)
 
                     # Draw end time
-                    day_canvas.create_text(center_x, end_y,
+                    day_canvas.create_text(center_x, time2_y,
                                           text=end_time,
                                           fill=self.colors['bg_dark'],
                                           font=time_font)
