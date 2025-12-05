@@ -1033,14 +1033,6 @@ class SchedulingTool:
             day_code = self.days[day_idx]
             desks = desks_per_day[day]
 
-            # Check if person is already scheduled this day
-            already_scheduled_this_day = any(
-                person['name'] in self.temp_schedule[day][idx]
-                for idx in range(len(self.timeslots) - 1)
-            )
-            if already_scheduled_this_day:
-                continue
-
             # Get available slots for this person
             if person['availability'].get(day_code, {}).get('whole_day', False):
                 available_slots = list(range(len(self.timeslots) - 1))
@@ -1055,7 +1047,7 @@ class SchedulingTool:
                 continue
 
             # Try to find continuous shifts
-            # Start with min_shift length, then try shorter if needed (Priority #5)
+            # Start with min_shift length, then try shorter if needed
             for target_length in sorted([min_shift] + list(range(1, min_shift)), reverse=True):
                 for start_idx in available_slots:
                     # Calculate how many slots we can actually use
@@ -1071,7 +1063,15 @@ class SchedulingTool:
                         if not all(idx in available_slots for idx in shift_slots):
                             continue
 
-                        # Check if all slots have room
+                        # CRITICAL: Check if person is already in any of these specific slots (prevent overlaps)
+                        already_in_slots = any(
+                            person['name'] in self.temp_schedule[day][idx]
+                            for idx in shift_slots
+                        )
+                        if already_in_slots:
+                            continue
+
+                        # Check if all slots have room (desk capacity constraint)
                         all_have_room = all(
                             len(self.temp_schedule[day][idx]) < desks
                             for idx in shift_slots
@@ -1086,14 +1086,15 @@ class SchedulingTool:
                         if shift_hours > hours_budget:
                             continue
 
-                        # Calculate score - prefer least-filled slots
+                        # Calculate score - slightly prefer least-filled slots but not critical
                         total_fill = sum(timeslot_counts[day][idx] for idx in shift_slots)
                         avg_fill = total_fill / len(shift_slots) if shift_slots else 0
 
-                        # Bonus for meeting min_shift_length (Priority #5)
-                        length_penalty = 0 if shift_hours >= min_shift else 50
+                        # Prioritize meeting min_shift_length
+                        length_penalty = 0 if shift_hours >= min_shift else 100
 
-                        score = avg_fill * 100 + length_penalty
+                        # Lower weight on distribution (10 vs 100) - allow uneven distribution
+                        score = avg_fill * 10 + length_penalty
 
                         if score < best_score:
                             best_score = score
@@ -1221,11 +1222,12 @@ class SchedulingTool:
                     if shift_hours > hours_budget:
                         continue
 
-                    # Calculate score - prefer least-filled slots
+                    # Calculate score - slightly prefer least-filled slots but not critical
                     total_fill = sum(timeslot_counts[day][idx] for idx in shift_slots)
                     avg_fill = total_fill / len(shift_slots) if shift_slots else 0
 
-                    score = avg_fill * 100
+                    # Lower weight on distribution - allow uneven distribution
+                    score = avg_fill * 10
 
                     if score < best_score:
                         best_score = score
