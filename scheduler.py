@@ -84,12 +84,12 @@ class SchedulingTool:
         # Configuration variables
         self.csv_file_path = None
         self.week_number = tk.StringVar(value="1")
-        self.desks_monday = tk.StringVar(value="2")
-        self.desks_tuesday = tk.StringVar(value="2")
-        self.desks_wednesday = tk.StringVar(value="2")
-        self.desks_thursday = tk.StringVar(value="2")
+        self.desks_monday = tk.StringVar(value="8")
+        self.desks_tuesday = tk.StringVar(value="8")
+        self.desks_wednesday = tk.StringVar(value="8")
+        self.desks_thursday = tk.StringVar(value="8")
         self.min_shift_length = tk.StringVar(value="3")
-        self.total_hours_target = tk.StringVar(value="100")
+        self.total_hours_target = tk.StringVar(value="135")
 
         self.setup_styles()
         self.setup_ui()
