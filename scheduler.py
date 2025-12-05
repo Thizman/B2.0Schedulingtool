@@ -632,22 +632,33 @@ class SchedulingTool:
                     draw.rectangle([block_x1, block_y1, block_x2, block_y2],
                                   fill=color, outline=border, width=2)
 
-                    # Draw name with adaptive sizing to ensure it fits
+                    # Draw name and times (three lines)
                     display_name = self.get_display_name(person_name)
                     if is_short:
                         display_name += " ⚠"
 
+                    # Get start and end times
+                    start_time = self.timeslots[start_idx]
+                    end_time = self.timeslots[end_idx]
+
                     # Calculate available width for text
                     text_available_width = block_x2 - block_x1 - 8  # 4px padding each side
+                    block_height = block_y2 - block_y1
 
                     # Try different font sizes to fit the text
                     current_font = small_font
+                    time_font_size = 8
+                    try:
+                        time_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", time_font_size)
+                    except:
+                        time_font = ImageFont.load_default()
+
+                    # Check if name fits
                     text_bbox = draw.textbbox((0, 0), display_name, font=current_font)
                     text_width = text_bbox[2] - text_bbox[0]
 
-                    # If text doesn't fit, try smaller font
+                    # If name doesn't fit, try smaller font
                     if text_width > text_available_width:
-                        # Try with even smaller font (size 7)
                         try:
                             tiny_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 7)
                         except:
@@ -660,21 +671,43 @@ class SchedulingTool:
                             current_font = tiny_font
                         else:
                             # If still doesn't fit, truncate
-                            # Estimate characters that fit
                             char_width = text_width / len(display_name) if len(display_name) > 0 else 5
                             max_chars = int(text_available_width / char_width) - 3
                             if max_chars > 0:
                                 display_name = display_name[:max_chars] + "..."
-                                text_bbox = draw.textbbox((0, 0), display_name, font=tiny_font)
-                                text_width = text_bbox[2] - text_bbox[0]
                             current_font = tiny_font
 
-                    # Center text in block
-                    text_height = text_bbox[3] - text_bbox[1]
-                    text_x = block_x1 + (block_x2 - block_x1 - text_width) // 2
-                    text_y = block_y1 + (block_y2 - block_y1 - text_height) // 2
+                    # Calculate vertical positions for three lines
+                    center_x = block_x1 + (block_x2 - block_x1) // 2
 
-                    draw.text((text_x, text_y), display_name, fill=bg_dark, font=current_font)
+                    # Position lines to fit within block
+                    if block_height >= 60:
+                        # Enough space for all three lines with good spacing
+                        name_y = block_y1 + block_height * 0.25
+                        start_y = block_y1 + block_height * 0.5
+                        end_y = block_y1 + block_height * 0.75
+                    else:
+                        # Compact spacing for shorter blocks
+                        line_spacing = max(10, block_height // 4)
+                        name_y = block_y1 + line_spacing
+                        start_y = name_y + line_spacing
+                        end_y = start_y + line_spacing
+
+                    # Draw name (centered)
+                    name_bbox = draw.textbbox((0, 0), display_name, font=current_font)
+                    name_width = name_bbox[2] - name_bbox[0]
+                    draw.text((center_x - name_width // 2, name_y), display_name, fill=bg_dark, font=current_font)
+
+                    # Draw start time with dash (centered)
+                    start_text = start_time + " -"
+                    start_bbox = draw.textbbox((0, 0), start_text, font=time_font)
+                    start_width = start_bbox[2] - start_bbox[0]
+                    draw.text((center_x - start_width // 2, start_y), start_text, fill=bg_dark, font=time_font)
+
+                    # Draw end time (centered)
+                    end_bbox = draw.textbbox((0, 0), end_time, font=time_font)
+                    end_width = end_bbox[2] - end_bbox[0]
+                    draw.text((center_x - end_width // 2, end_y), end_time, fill=bg_dark, font=time_font)
 
         # Hours section (right side)
         hours_x = 1040  # Moved right to accommodate wider schedule
@@ -1233,39 +1266,76 @@ class SchedulingTool:
                     self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
                                           fill=color, outline=self.colors['border'], width=2)
 
-                    # Add name with adaptive font size to ensure it fits
+                    # Add name and times (three lines)
                     display_name = self.get_display_name(person_name)
                     if is_short:
                         display_name += " ⚠"
 
+                    # Get start and end times
+                    start_time = self.timeslots[start_idx]
+                    end_time = self.timeslots[end_idx]
+
                     # Calculate available width
                     available_width = x2 - x1 - 10  # 5px padding on each side
-                    text_y = (y1 + y2) / 2
+                    block_height = y2 - y1
 
                     # Try different font sizes to fit the text
-                    font_size = 10
+                    font_size = 9
                     font = ("Consolas", font_size, "bold")
+                    time_font = ("Consolas", font_size - 1)
 
-                    # Estimate text width (rough approximation: 0.6 * font_size per character)
-                    estimated_width = len(display_name) * (font_size * 0.6)
+                    # Estimate text width for the longest line (usually the start time with dash)
+                    longest_text = max([display_name, start_time + " -", end_time], key=len)
+                    estimated_width = len(longest_text) * (font_size * 0.6)
 
                     # Reduce font size if text is too wide
                     while estimated_width > available_width and font_size > 6:
                         font_size -= 1
                         font = ("Consolas", font_size, "bold")
-                        estimated_width = len(display_name) * (font_size * 0.6)
+                        time_font = ("Consolas", max(6, font_size - 1))
+                        longest_text = max([display_name, start_time + " -", end_time], key=len)
+                        estimated_width = len(longest_text) * (font_size * 0.6)
 
-                    # If still too wide, truncate with ellipsis
+                    # If still too wide, truncate name with ellipsis
                     final_name = display_name
-                    if estimated_width > available_width:
+                    if len(display_name) * (font_size * 0.6) > available_width:
                         max_chars = int(available_width / (font_size * 0.6)) - 3
                         if max_chars > 0:
                             final_name = display_name[:max_chars] + "..."
 
-                    day_canvas.create_text((x1 + x2) / 2, text_y,
+                    # Calculate vertical positions for three lines
+                    center_x = (x1 + x2) / 2
+                    line_spacing = min(font_size + 2, block_height / 4)
+
+                    # Position lines to fit within block
+                    if block_height >= 40:
+                        # Enough space for all three lines with spacing
+                        name_y = y1 + block_height * 0.3
+                        start_y = y1 + block_height * 0.55
+                        end_y = y1 + block_height * 0.8
+                    else:
+                        # Compact spacing for shorter blocks
+                        name_y = y1 + 10
+                        start_y = name_y + line_spacing
+                        end_y = start_y + line_spacing
+
+                    # Draw name
+                    day_canvas.create_text(center_x, name_y,
                                           text=final_name,
                                           fill=self.colors['bg_dark'],
                                           font=font)
+
+                    # Draw start time with dash
+                    day_canvas.create_text(center_x, start_y,
+                                          text=start_time + " -",
+                                          fill=self.colors['bg_dark'],
+                                          font=time_font)
+
+                    # Draw end time
+                    day_canvas.create_text(center_x, end_y,
+                                          text=end_time,
+                                          fill=self.colors['bg_dark'],
+                                          font=time_font)
 
         day_canvas.bind('<Configure>', draw_schedule)
         day_canvas.after(100, draw_schedule)
