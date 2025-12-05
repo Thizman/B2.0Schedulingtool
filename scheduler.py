@@ -540,8 +540,8 @@ class SchedulingTool:
         day_width = 480  # Increased to accommodate 8 desks comfortably
         day_height = 420
 
-        # Draw 2x2 grid of days
-        positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
+        # Draw 2x2 grid of days (same order as interface)
+        positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
         for idx, day in enumerate(self.day_names):
             row, col = positions[idx]
