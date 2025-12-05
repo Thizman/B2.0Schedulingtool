@@ -325,121 +325,105 @@ class SchedulingTool:
     def setup_display_section(self, parent):
         # Create container for side-by-side layout
         display_container = tk.Frame(parent, bg=self.colors['bg_dark'])
-        display_container.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=(10, 20))
+        display_container.grid(row=1, column=0, sticky=(tk.W, tk.N), padx=10, pady=(10, 20))
 
-        # Configure grid weights
-        display_container.columnconfigure(0, weight=2)  # Schedule gets more space
-        display_container.columnconfigure(1, weight=1)  # Hours gets less space
-
-        # Schedule section (left side) with scrollable canvas
+        # Schedule section (left side)
         schedule_container = tk.Frame(display_container, bg=self.colors['bg_dark'])
-        schedule_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        schedule_container.grid(row=0, column=0, sticky=(tk.W, tk.N), padx=(0, 10))
 
-        # Create outer canvas with rounded border for schedule
-        schedule_canvas_width = 950
-        schedule_canvas_height = 850
+        # Create canvas border for schedule (will resize based on content)
         self.schedule_canvas_border = tk.Canvas(schedule_container,
-                                               width=schedule_canvas_width,
-                                               height=schedule_canvas_height,
                                                bg=self.colors['bg_dark'],
                                                highlightthickness=0)
-        self.schedule_canvas_border.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.schedule_canvas_border.pack()
 
-        # Draw rounded border for schedule
-        self.draw_rounded_rect(self.schedule_canvas_border, 2, 2,
-                              schedule_canvas_width-2, schedule_canvas_height-2, 10,
-                              fill=self.colors['bg_dark'],
-                              outline=self.colors['border'], width=2)
+        # Create frame for schedule content directly (no scrolling)
+        self.schedule_frame = tk.Frame(self.schedule_canvas_border, bg=self.colors['bg_dark'])
 
-        # Create scrollable inner canvas for schedule content
-        inner_canvas_width = schedule_canvas_width - 50
-        inner_canvas_height = schedule_canvas_height - 40
+        # Placeholder will be replaced when schedule is generated
+        self.schedule_content_window = None
 
-        self.schedule_inner_canvas = tk.Canvas(self.schedule_canvas_border,
-                                              bg=self.colors['bg_dark'],
-                                              width=inner_canvas_width,
-                                              height=inner_canvas_height,
-                                              highlightthickness=0)
-
-        schedule_scrollbar = ttk.Scrollbar(self.schedule_canvas_border,
-                                          orient="vertical",
-                                          command=self.schedule_inner_canvas.yview)
-
-        # Position scrollbar on the right side
-        self.schedule_canvas_border.create_window(schedule_canvas_width - 30, 20,
-                                                 window=schedule_scrollbar,
-                                                 width=15,
-                                                 height=schedule_canvas_height - 40,
-                                                 anchor=tk.NW)
-
-        # Position inner canvas
-        self.schedule_canvas_border.create_window(20, 20,
-                                                 window=self.schedule_inner_canvas,
-                                                 anchor=tk.NW)
-
-        self.schedule_frame = tk.Frame(self.schedule_inner_canvas, bg=self.colors['bg_dark'])
-        self.schedule_frame.bind("<Configure>",
-                                lambda e: self.schedule_inner_canvas.configure(scrollregion=self.schedule_inner_canvas.bbox("all")))
-
-        self.schedule_inner_canvas.create_window((0, 0), window=self.schedule_frame, anchor=tk.NW)
-        self.schedule_inner_canvas.configure(yscrollcommand=schedule_scrollbar.set)
-
-        # Hours section (right side) with scrollable canvas
+        # Hours section (right side)
         hours_container = tk.Frame(display_container, bg=self.colors['bg_dark'])
-        hours_container.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        hours_container.grid(row=0, column=1, sticky=(tk.W, tk.N))
 
-        # Create outer canvas with rounded border for hours
-        hours_canvas_width = 420
-        hours_canvas_height = 850
+        # Create canvas border for hours (will resize based on content)
         self.hours_canvas_border = tk.Canvas(hours_container,
-                                            width=hours_canvas_width,
-                                            height=hours_canvas_height,
                                             bg=self.colors['bg_dark'],
                                             highlightthickness=0)
-        self.hours_canvas_border.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.hours_canvas_border.pack()
 
-        # Draw rounded border for hours
-        self.draw_rounded_rect(self.hours_canvas_border, 2, 2,
-                              hours_canvas_width-2, hours_canvas_height-2, 10,
-                              fill=self.colors['bg_dark'],
-                              outline=self.colors['border'], width=2)
+        # Create frame for hours content directly (no scrolling)
+        self.hours_frame = tk.Frame(self.hours_canvas_border, bg=self.colors['bg_dark'])
 
-        # Create scrollable inner canvas for hours content
-        hours_inner_width = hours_canvas_width - 50
-        hours_inner_height = hours_canvas_height - 40
-
-        self.hours_inner_canvas = tk.Canvas(self.hours_canvas_border,
-                                           bg=self.colors['bg_dark'],
-                                           width=hours_inner_width,
-                                           height=hours_inner_height,
-                                           highlightthickness=0)
-
-        hours_scrollbar = ttk.Scrollbar(self.hours_canvas_border,
-                                       orient="vertical",
-                                       command=self.hours_inner_canvas.yview)
-
-        # Position scrollbar on the right side
-        self.hours_canvas_border.create_window(hours_canvas_width - 30, 20,
-                                              window=hours_scrollbar,
-                                              width=15,
-                                              height=hours_canvas_height - 40,
-                                              anchor=tk.NW)
-
-        # Position inner canvas
-        self.hours_canvas_border.create_window(20, 20,
-                                              window=self.hours_inner_canvas,
-                                              anchor=tk.NW)
-
-        self.hours_frame = tk.Frame(self.hours_inner_canvas, bg=self.colors['bg_dark'])
-        self.hours_frame.bind("<Configure>",
-                             lambda e: self.hours_inner_canvas.configure(scrollregion=self.hours_inner_canvas.bbox("all")))
-
-        self.hours_inner_canvas.create_window((0, 0), window=self.hours_frame, anchor=tk.NW)
-        self.hours_inner_canvas.configure(yscrollcommand=hours_scrollbar.set)
+        # Placeholder will be replaced when schedule is generated
+        self.hours_content_window = None
 
         # Show placeholder initially
         self.show_placeholder(self.schedule_frame, "Load CSV and Generate Schedule")
         self.show_placeholder(self.hours_frame, "Hours Tracker")
+
+        # Initial sizing
+        self.update_schedule_canvas_size()
+        self.update_hours_canvas_size()
+
+    def update_schedule_canvas_size(self):
+        """Update schedule canvas size based on content"""
+        self.schedule_frame.update_idletasks()
+
+        # Get the required size for the content
+        content_width = self.schedule_frame.winfo_reqwidth()
+        content_height = self.schedule_frame.winfo_reqheight()
+
+        # Add padding for the border
+        canvas_width = content_width + 40
+        canvas_height = content_height + 40
+
+        # Update canvas size
+        self.schedule_canvas_border.configure(width=canvas_width, height=canvas_height)
+
+        # Redraw border
+        self.schedule_canvas_border.delete("border")
+        self.draw_rounded_rect(self.schedule_canvas_border, 2, 2,
+                              canvas_width-2, canvas_height-2, 10,
+                              fill=self.colors['bg_dark'],
+                              outline=self.colors['border'], width=2,
+                              tags="border")
+
+        # Position content window
+        if self.schedule_content_window:
+            self.schedule_canvas_border.delete(self.schedule_content_window)
+        self.schedule_content_window = self.schedule_canvas_border.create_window(
+            20, 20, window=self.schedule_frame, anchor=tk.NW)
+
+    def update_hours_canvas_size(self):
+        """Update hours canvas size based on content"""
+        self.hours_frame.update_idletasks()
+
+        # Get the required size for the content
+        content_width = self.hours_frame.winfo_reqwidth()
+        content_height = self.hours_frame.winfo_reqheight()
+
+        # Add padding for the border
+        canvas_width = content_width + 40
+        canvas_height = content_height + 40
+
+        # Update canvas size
+        self.hours_canvas_border.configure(width=canvas_width, height=canvas_height)
+
+        # Redraw border
+        self.hours_canvas_border.delete("border")
+        self.draw_rounded_rect(self.hours_canvas_border, 2, 2,
+                              canvas_width-2, canvas_height-2, 10,
+                              fill=self.colors['bg_dark'],
+                              outline=self.colors['border'], width=2,
+                              tags="border")
+
+        # Position content window
+        if self.hours_content_window:
+            self.hours_canvas_border.delete(self.hours_content_window)
+        self.hours_content_window = self.hours_canvas_border.create_window(
+            20, 20, window=self.hours_frame, anchor=tk.NW)
 
     def show_placeholder(self, parent, message):
         """Show a placeholder message in empty frames"""
@@ -1086,6 +1070,10 @@ class SchedulingTool:
             desks = self.desks_per_day[day]  # Get desk count for this specific day
             self.create_day_block(days_grid, day, day_idx, desks, min_shift, row, col)
 
+        # Update canvas size to fit content
+        self.schedule_frame.update_idletasks()
+        self.update_schedule_canvas_size()
+
     def create_day_block(self, parent, day, day_idx, desks, min_shift, row, col):
         """Create a single day schedule block"""
         # Day container with rounded appearance
@@ -1268,40 +1256,41 @@ class SchedulingTool:
         fill = kwargs.get('fill', '')
         outline = kwargs.get('outline', '')
         width = kwargs.get('width', 1)
+        tags = kwargs.get('tags', ())
 
         # Draw filled rounded rectangle
         if fill:
             canvas.create_arc(x1, y1, x1+radius*2, y1+radius*2,
-                             start=90, extent=90, fill=fill, outline="")
+                             start=90, extent=90, fill=fill, outline="", tags=tags)
             canvas.create_arc(x2-radius*2, y1, x2, y1+radius*2,
-                             start=0, extent=90, fill=fill, outline="")
+                             start=0, extent=90, fill=fill, outline="", tags=tags)
             canvas.create_arc(x1, y2-radius*2, x1+radius*2, y2,
-                             start=180, extent=90, fill=fill, outline="")
+                             start=180, extent=90, fill=fill, outline="", tags=tags)
             canvas.create_arc(x2-radius*2, y2-radius*2, x2, y2,
-                             start=270, extent=90, fill=fill, outline="")
+                             start=270, extent=90, fill=fill, outline="", tags=tags)
             canvas.create_rectangle(x1+radius, y1, x2-radius, y2,
-                                   fill=fill, outline="")
+                                   fill=fill, outline="", tags=tags)
             canvas.create_rectangle(x1, y1+radius, x2, y2-radius,
-                                   fill=fill, outline="")
+                                   fill=fill, outline="", tags=tags)
 
         # Draw rounded outline
         if outline:
             canvas.create_arc(x1, y1, x1+radius*2, y1+radius*2,
-                             start=90, extent=90, outline=outline, width=width, style='arc')
+                             start=90, extent=90, outline=outline, width=width, style='arc', tags=tags)
             canvas.create_arc(x2-radius*2, y1, x2, y1+radius*2,
-                             start=0, extent=90, outline=outline, width=width, style='arc')
+                             start=0, extent=90, outline=outline, width=width, style='arc', tags=tags)
             canvas.create_arc(x1, y2-radius*2, x1+radius*2, y2,
-                             start=180, extent=90, outline=outline, width=width, style='arc')
+                             start=180, extent=90, outline=outline, width=width, style='arc', tags=tags)
             canvas.create_arc(x2-radius*2, y2-radius*2, x2, y2,
-                             start=270, extent=90, outline=outline, width=width, style='arc')
+                             start=270, extent=90, outline=outline, width=width, style='arc', tags=tags)
             canvas.create_line(x1+radius, y1, x2-radius, y1,
-                              fill=outline, width=width)
+                              fill=outline, width=width, tags=tags)
             canvas.create_line(x1+radius, y2, x2-radius, y2,
-                              fill=outline, width=width)
+                              fill=outline, width=width, tags=tags)
             canvas.create_line(x1, y1+radius, x1, y2-radius,
-                              fill=outline, width=width)
+                              fill=outline, width=width, tags=tags)
             canvas.create_line(x2, y1+radius, x2, y2-radius,
-                              fill=outline, width=width)
+                              fill=outline, width=width, tags=tags)
 
     def display_hours(self):
         # Clear previous display
@@ -1372,6 +1361,10 @@ class SchedulingTool:
                                fg=self.colors['text_secondary'],
                                bg=self.colors['bg_dark'])
                 label.grid(row=row, column=col, padx=15, pady=4, sticky=tk.W)
+
+        # Update canvas size to fit content
+        self.hours_frame.update_idletasks()
+        self.update_hours_canvas_size()
 
 
 def main():
