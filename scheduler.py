@@ -336,8 +336,8 @@ class SchedulingTool:
         schedule_container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
 
         # Create outer canvas with rounded border for schedule
-        schedule_canvas_width = 900
-        schedule_canvas_height = 800
+        schedule_canvas_width = 950
+        schedule_canvas_height = 850
         self.schedule_canvas_border = tk.Canvas(schedule_container,
                                                width=schedule_canvas_width,
                                                height=schedule_canvas_height,
@@ -352,20 +352,34 @@ class SchedulingTool:
                               outline=self.colors['border'], width=2)
 
         # Create scrollable inner canvas for schedule content
+        inner_canvas_width = schedule_canvas_width - 50
+        inner_canvas_height = schedule_canvas_height - 40
+
         self.schedule_inner_canvas = tk.Canvas(self.schedule_canvas_border,
                                               bg=self.colors['bg_dark'],
+                                              width=inner_canvas_width,
+                                              height=inner_canvas_height,
                                               highlightthickness=0)
+
         schedule_scrollbar = ttk.Scrollbar(self.schedule_canvas_border,
                                           orient="vertical",
                                           command=self.schedule_inner_canvas.yview)
 
+        # Position scrollbar on the right side
+        self.schedule_canvas_border.create_window(schedule_canvas_width - 30, 20,
+                                                 window=schedule_scrollbar,
+                                                 width=15,
+                                                 height=schedule_canvas_height - 40,
+                                                 anchor=tk.NW)
+
+        # Position inner canvas
+        self.schedule_canvas_border.create_window(20, 20,
+                                                 window=self.schedule_inner_canvas,
+                                                 anchor=tk.NW)
+
         self.schedule_frame = tk.Frame(self.schedule_inner_canvas, bg=self.colors['bg_dark'])
         self.schedule_frame.bind("<Configure>",
                                 lambda e: self.schedule_inner_canvas.configure(scrollregion=self.schedule_inner_canvas.bbox("all")))
-
-        self.schedule_canvas_border.create_window(15, 15, window=self.schedule_inner_canvas,
-                                                 width=schedule_canvas_width-45,
-                                                 height=schedule_canvas_height-30, anchor=tk.NW)
 
         self.schedule_inner_canvas.create_window((0, 0), window=self.schedule_frame, anchor=tk.NW)
         self.schedule_inner_canvas.configure(yscrollcommand=schedule_scrollbar.set)
@@ -375,8 +389,8 @@ class SchedulingTool:
         hours_container.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         # Create outer canvas with rounded border for hours
-        hours_canvas_width = 400
-        hours_canvas_height = 800
+        hours_canvas_width = 420
+        hours_canvas_height = 850
         self.hours_canvas_border = tk.Canvas(hours_container,
                                             width=hours_canvas_width,
                                             height=hours_canvas_height,
@@ -391,20 +405,34 @@ class SchedulingTool:
                               outline=self.colors['border'], width=2)
 
         # Create scrollable inner canvas for hours content
+        hours_inner_width = hours_canvas_width - 50
+        hours_inner_height = hours_canvas_height - 40
+
         self.hours_inner_canvas = tk.Canvas(self.hours_canvas_border,
                                            bg=self.colors['bg_dark'],
+                                           width=hours_inner_width,
+                                           height=hours_inner_height,
                                            highlightthickness=0)
+
         hours_scrollbar = ttk.Scrollbar(self.hours_canvas_border,
                                        orient="vertical",
                                        command=self.hours_inner_canvas.yview)
 
+        # Position scrollbar on the right side
+        self.hours_canvas_border.create_window(hours_canvas_width - 30, 20,
+                                              window=hours_scrollbar,
+                                              width=15,
+                                              height=hours_canvas_height - 40,
+                                              anchor=tk.NW)
+
+        # Position inner canvas
+        self.hours_canvas_border.create_window(20, 20,
+                                              window=self.hours_inner_canvas,
+                                              anchor=tk.NW)
+
         self.hours_frame = tk.Frame(self.hours_inner_canvas, bg=self.colors['bg_dark'])
         self.hours_frame.bind("<Configure>",
                              lambda e: self.hours_inner_canvas.configure(scrollregion=self.hours_inner_canvas.bbox("all")))
-
-        self.hours_canvas_border.create_window(15, 15, window=self.hours_inner_canvas,
-                                              width=hours_canvas_width-30,
-                                              height=hours_canvas_height-30, anchor=tk.NW)
 
         self.hours_inner_canvas.create_window((0, 0), window=self.hours_frame, anchor=tk.NW)
         self.hours_inner_canvas.configure(yscrollcommand=hours_scrollbar.set)
@@ -1030,7 +1058,7 @@ class SchedulingTool:
 
         # Main container
         main_container = tk.Frame(self.schedule_frame, bg=self.colors['bg_dark'])
-        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Week information at top
         week_info = tk.Label(main_container,
@@ -1063,7 +1091,7 @@ class SchedulingTool:
         # Day container with rounded appearance
         day_container = tk.Frame(parent, bg=self.colors['bg_dark'])
         day_container.grid(row=row, column=col, sticky=(tk.W, tk.E, tk.N, tk.S),
-                          padx=10, pady=10)
+                          padx=5, pady=5)
 
         # Day header
         header = tk.Frame(day_container, bg=self.colors['bg_medium'],
