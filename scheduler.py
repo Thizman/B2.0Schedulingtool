@@ -1382,6 +1382,29 @@ class SchedulingTool:
                                bg=self.colors['bg_dark'])
                 label.grid(row=row, column=col, padx=15, pady=4, sticky=tk.W)
 
+        # Add separator before total
+        total_row = len(sorted_people) + 2
+        separator2 = tk.Frame(container, height=2, bg=self.colors['border'])
+        separator2.grid(row=total_row, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(10, 10))
+
+        # Add total hours row
+        total_row += 1
+        total_scheduled = sum(self.hours_scheduled.values())
+
+        # Total label
+        total_label = tk.Label(container, text="Total Hours:",
+                              font=("Consolas", 11, "bold"),
+                              fg=self.colors['accent'],
+                              bg=self.colors['bg_dark'])
+        total_label.grid(row=total_row, column=0, padx=(10, 15), pady=8, sticky=tk.W)
+
+        # Total hours value (in accent color)
+        total_value = tk.Label(container, text=f"{total_scheduled:.1f}h",
+                              font=("Consolas", 12, "bold"),
+                              fg=self.colors['accent_hover'],
+                              bg=self.colors['bg_dark'])
+        total_value.grid(row=total_row, column=1, padx=15, pady=8, sticky=tk.W)
+
         # Update canvas size to fit content
         self.hours_frame.update_idletasks()
         self.update_hours_canvas_size()
