@@ -588,7 +588,11 @@ class SchedulingTool:
 
             # Draw schedule blocks
             if day in self.schedule:
-                block_width = (day_width - 120) // desks
+                # Calculate available width for blocks (from after warnings to right edge)
+                blocks_start_x = time_x + 100
+                available_width = day_width - (blocks_start_x - x) - 10  # 10px right margin
+                block_width = available_width // desks if desks > 0 else available_width
+
                 lanes = [[] for _ in range(desks)]
 
                 people_shifts = list(self.schedule[day].items())
@@ -616,9 +620,9 @@ class SchedulingTool:
                         assigned_lane = 0
 
                     # Calculate position
-                    block_x1 = time_x + 100 + (assigned_lane * block_width)
+                    block_x1 = blocks_start_x + (assigned_lane * block_width) + 2
                     block_y1 = content_start_y + (start_idx * slot_height) + 2
-                    block_x2 = block_x1 + block_width - 4
+                    block_x2 = blocks_start_x + ((assigned_lane + 1) * block_width) - 2
                     block_y2 = content_start_y + (end_idx * slot_height) - 2
 
                     # Get color
@@ -628,19 +632,49 @@ class SchedulingTool:
                     draw.rectangle([block_x1, block_y1, block_x2, block_y2],
                                   fill=color, outline=border, width=2)
 
-                    # Draw name
+                    # Draw name with adaptive sizing to ensure it fits
                     display_name = self.get_display_name(person_name)
                     if is_short:
                         display_name += " ⚠"
 
-                    # Center text in block
-                    text_bbox = draw.textbbox((0, 0), display_name, font=small_font)
+                    # Calculate available width for text
+                    text_available_width = block_x2 - block_x1 - 8  # 4px padding each side
+
+                    # Try different font sizes to fit the text
+                    current_font = small_font
+                    text_bbox = draw.textbbox((0, 0), display_name, font=current_font)
                     text_width = text_bbox[2] - text_bbox[0]
+
+                    # If text doesn't fit, try smaller font
+                    if text_width > text_available_width:
+                        # Try with even smaller font (size 7)
+                        try:
+                            tiny_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 7)
+                        except:
+                            tiny_font = ImageFont.load_default()
+
+                        text_bbox = draw.textbbox((0, 0), display_name, font=tiny_font)
+                        text_width = text_bbox[2] - text_bbox[0]
+
+                        if text_width <= text_available_width:
+                            current_font = tiny_font
+                        else:
+                            # If still doesn't fit, truncate
+                            # Estimate characters that fit
+                            char_width = text_width / len(display_name) if len(display_name) > 0 else 5
+                            max_chars = int(text_available_width / char_width) - 3
+                            if max_chars > 0:
+                                display_name = display_name[:max_chars] + "..."
+                                text_bbox = draw.textbbox((0, 0), display_name, font=tiny_font)
+                                text_width = text_bbox[2] - text_bbox[0]
+                            current_font = tiny_font
+
+                    # Center text in block
                     text_height = text_bbox[3] - text_bbox[1]
                     text_x = block_x1 + (block_x2 - block_x1 - text_width) // 2
                     text_y = block_y1 + (block_y2 - block_y1 - text_height) // 2
 
-                    draw.text((text_x, text_y), display_name, fill=bg_dark, font=small_font)
+                    draw.text((text_x, text_y), display_name, fill=bg_dark, font=current_font)
 
         # Hours section (right side)
         hours_x = 720
