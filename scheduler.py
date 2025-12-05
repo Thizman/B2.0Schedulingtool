@@ -57,6 +57,7 @@ class SchedulingTool:
             'text_muted': '#808080',
             'success': '#5eb56e',
             'warning': '#d4734b',
+            'warning_yellow': '#e8c547',  # Yellow for moderate warnings
             'error': '#d44747',
             'border': '#5a5a5a'        # Lightest grey for borders
         }
@@ -1351,8 +1352,8 @@ class SchedulingTool:
                 y_pos = i * SLOT_HEIGHT + 5  # Position at top of each slot with small offset
 
                 # Choose color based on how many desks are filled
-                # Orange if at least 2 desks filled, red if less than 2
-                warning_color = self.colors['warning'] if slot_counts[i] >= 2 else self.colors['error']
+                # Yellow if at least 2 desks filled, red if less than 2
+                warning_color = self.colors['warning_yellow'] if slot_counts[i] >= 2 else self.colors['error']
 
                 warning_canvas.create_text(5, y_pos, text=f"⚠ {slot_counts[i]}/{desks}",
                                          font=("Consolas", 8),
