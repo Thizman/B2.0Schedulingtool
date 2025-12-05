@@ -687,7 +687,7 @@ class SchedulingTool:
                     # Start from top of block with small padding
                     start_y_pos = block_y1 + 8
                     name_y = start_y_pos
-                    time1_y = name_y + line_spacing
+                    time1_y = name_y + line_spacing + 3  # Extra 3px spacing after name
                     dash_y = time1_y + line_spacing
                     time2_y = dash_y + line_spacing
 
@@ -1312,7 +1312,7 @@ class SchedulingTool:
                     # Start from top of block with small padding
                     start_y = y1 + 8
                     name_y = start_y
-                    time1_y = name_y + line_spacing
+                    time1_y = name_y + line_spacing + 3  # Extra 3px spacing after name
                     dash_y = time1_y + line_spacing
                     time2_y = dash_y + line_spacing
 
