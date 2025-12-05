@@ -1116,22 +1116,32 @@ class SchedulingTool:
         schedule_grid = tk.Frame(day_container, bg=self.colors['bg_dark'])
         schedule_grid.pack(fill=tk.BOTH, expand=True)
 
-        # Time column
-        time_col = tk.Frame(schedule_grid, bg=self.colors['bg_dark'], width=60)
-        time_col.grid(row=0, column=0, sticky=(tk.N, tk.S), padx=(0, 5))
+        # Create canvas with reduced height
+        SLOT_HEIGHT = 45  # Reduced from ~64 to 45 pixels per slot
+        canvas_height = len(self.timeslots[:-1]) * SLOT_HEIGHT
 
-        # Warning column
-        warning_col = tk.Frame(schedule_grid, bg=self.colors['bg_dark'], width=50)
-        warning_col.grid(row=0, column=1, sticky=(tk.N, tk.S), padx=(0, 5))
+        # Time column - use Canvas for exact positioning
+        time_canvas = tk.Canvas(schedule_grid, width=60, height=canvas_height,
+                               bg=self.colors['bg_dark'], highlightthickness=0)
+        time_canvas.grid(row=0, column=0, sticky=(tk.N, tk.S), padx=(0, 5))
+
+        # Add time labels aligned with grid lines
+        for i, time in enumerate(self.timeslots[:-1]):
+            y_pos = i * SLOT_HEIGHT + 5  # Position at top of each slot with small offset
+            time_canvas.create_text(55, y_pos, text=time,
+                                   font=("Consolas", 9),
+                                   fill=self.colors['text_muted'],
+                                   anchor=tk.E)
+
+        # Warning column - use Canvas for exact positioning
+        warning_canvas = tk.Canvas(schedule_grid, width=50, height=canvas_height,
+                                  bg=self.colors['bg_dark'], highlightthickness=0)
+        warning_canvas.grid(row=0, column=1, sticky=(tk.N, tk.S), padx=(0, 5))
 
         # Calendar canvas
         canvas_frame = tk.Frame(schedule_grid, bg=self.colors['bg_dark'])
         canvas_frame.grid(row=0, column=2, sticky=(tk.W, tk.E, tk.N, tk.S))
         schedule_grid.columnconfigure(2, weight=1)
-
-        # Create canvas with reduced height
-        SLOT_HEIGHT = 45  # Reduced from ~64 to 45 pixels per slot
-        canvas_height = len(self.timeslots[:-1]) * SLOT_HEIGHT
 
         day_canvas = tk.Canvas(canvas_frame,
                               height=canvas_height,
@@ -1139,20 +1149,6 @@ class SchedulingTool:
                               highlightthickness=1,
                               highlightbackground=self.colors['border'])
         day_canvas.pack(fill=tk.BOTH, expand=True)
-
-        # Add time labels with exact SLOT_HEIGHT spacing
-        for i, time in enumerate(self.timeslots[:-1]):
-            # Create a frame with fixed height to ensure exact alignment
-            label_frame = tk.Frame(time_col, bg=self.colors['bg_dark'], height=SLOT_HEIGHT)
-            label_frame.grid(row=i, column=0, sticky=(tk.N, tk.S, tk.E))
-            label_frame.grid_propagate(False)  # Prevent frame from shrinking
-
-            # Center label within the frame
-            tk.Label(label_frame, text=time,
-                    font=("Consolas", 9),
-                    fg=self.colors['text_muted'],
-                    bg=self.colors['bg_dark'],
-                    anchor=tk.E).pack(expand=True, side=tk.RIGHT, padx=(0, 5))
 
         # Count capacity and add warnings
         slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
@@ -1163,22 +1159,14 @@ class SchedulingTool:
                     if i in slot_counts:
                         slot_counts[i] += 1
 
-        # Add warning labels with exact SLOT_HEIGHT spacing
+        # Add warning labels aligned with grid lines
         for i in range(len(self.timeslots) - 1):
-            # Create a frame with fixed height for each warning slot to ensure exact alignment
-            warning_frame = tk.Frame(warning_col, bg=self.colors['bg_dark'], height=SLOT_HEIGHT)
-            warning_frame.grid(row=i, column=0, sticky=(tk.N, tk.S, tk.W))
-            warning_frame.grid_propagate(False)  # Prevent frame from shrinking
-
             if slot_counts[i] < desks:
-                warning_label = tk.Label(warning_frame,
-                                        text=f"⚠ {slot_counts[i]}/{desks}",
-                                        font=("Consolas", 8),
-                                        fg=self.colors['error'],
-                                        bg=self.colors['bg_dark'])
-                warning_label.pack(expand=True, side=tk.LEFT, padx=(5, 0))
-                # Add tooltip explaining the warning
-                ToolTip(warning_label, f"Understaffed: Only {slot_counts[i]} of {desks} desks filled")
+                y_pos = i * SLOT_HEIGHT + 5  # Position at top of each slot with small offset
+                warning_canvas.create_text(5, y_pos, text=f"⚠ {slot_counts[i]}/{desks}",
+                                         font=("Consolas", 8),
+                                         fill=self.colors['error'],
+                                         anchor=tk.W)
 
         # Update canvas when it's sized
         def draw_schedule(event=None):
