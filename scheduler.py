@@ -533,6 +533,55 @@ class SchedulingTool:
         except ValueError:
             return "Invalid week number"
 
+    def export_csv(self):
+        """Export the schedule as a CSV file"""
+        if not self.schedule_generated:
+            messagebox.showwarning("Warning", "Please generate a schedule first")
+            return
+
+        try:
+            # Get week info for filename
+            week_num = int(self.week_number.get())
+            filename = f"B2.0 Schedule week {week_num}.csv"
+
+            # Ask user where to save
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv")],
+                initialfile=filename
+            )
+
+            if not file_path:
+                return
+
+            # Create CSV
+            with open(file_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+
+                # Write header
+                writer.writerow(['Name', 'Day', 'Shifts', 'Hours'])
+
+                # Write schedule data
+                for day in self.day_names:
+                    if day in self.schedule:
+                        for person_name, person_data in sorted(self.schedule[day].items()):
+                            shifts = person_data['shifts']
+                            hours = person_data['hours']
+
+                            # Format shifts as time ranges
+                            shift_ranges = []
+                            for shift_code in shifts:
+                                shift_info = self.shift_definitions[shift_code]
+                                shift_ranges.append(f"{shift_info['start']}-{shift_info['end']}")
+
+                            shifts_str = ', '.join(shift_ranges)
+                            writer.writerow([person_name, day, shifts_str, f"{hours:.2f}"])
+
+            messagebox.showinfo("Success", f"Schedule exported to:\n{file_path}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export CSV: {str(e)}")
+
     def export_schedule(self):
         """Export the schedule and hours tracker as PNG"""
         if not self.schedule_generated:
@@ -572,10 +621,10 @@ class SchedulingTool:
             messagebox.showerror("Error", f"Failed to export schedule: {str(e)}")
 
     def create_export_image(self, file_path, week_text):
-        """Create a professional PNG export of schedule and hours"""
-        # Image dimensions (increased to accommodate wider day blocks)
+        """Create a professional PNG export of schedule and hours using shift codes"""
+        # Image dimensions (increased for 2 weeks)
         img_width = 1600
-        img_height = 1100
+        img_height = 1400
 
         # Create image with dark background
         img = Image.new('RGB', (img_width, img_height), color='#2a2a2a')
@@ -602,23 +651,23 @@ class SchedulingTool:
         accent = '#d4734b'
         border = '#5a5a5a'
         error = '#d44747'
-        success = '#5eb56e'
-        warning_color = '#d4734b'
 
         # Draw title
         draw.text((30, 30), week_text, fill=accent, font=title_font)
 
-        # Schedule section (left side)
+        # Schedule section (left side) - 8 days in 2x4 grid
         schedule_x = 30
         schedule_y = 70
-        day_width = 480  # Increased to accommodate 8 desks comfortably
-        day_height = 420
+        day_width = 350
+        day_height = 300
 
-        # Draw 2x2 grid of days (same order as interface)
-        positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
+        # Shift heights for drawing
+        shift_heights = {"0930": 30, "1030": 70, "1315": 70, "1530": 50}
 
-        for idx, day in enumerate(self.day_names):
-            row, col = positions[idx]
+        # Draw 2x4 grid of days (2 columns, 4 rows for 8 days)
+        for day_idx, day in enumerate(self.day_names):
+            col = day_idx % 2
+            row = day_idx // 2
             x = schedule_x + (col * (day_width + 20))
             y = schedule_y + (row * (day_height + 20))
 
@@ -627,178 +676,129 @@ class SchedulingTool:
                           outline=border, width=2)
 
             # Draw day header
-            draw.rectangle([x, y, x + day_width, y + 35],
+            draw.rectangle([x, y, x + day_width, y + 30],
                           fill=bg_medium, outline=border, width=1)
             draw.text((x + 10, y + 10), day, fill=text_primary, font=header_font)
 
             # Get desk count for this day
             desks = self.desks_per_day[day]
-            min_shift = int(self.min_shift_length.get())
 
-            # Draw timeslots and schedule
-            slot_height = 40
+            # Draw shift times and schedule
             time_x = x + 10
-            content_start_y = y + 45
+            content_start_y = y + 40
 
-            # Count slot capacity
-            slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
+            # Count shift capacity
+            shift_counts = {code: 0 for code in self.timeslot_codes}
             if day in self.schedule:
-                for person_name, shift in self.schedule[day].items():
-                    for i in range(shift['start'], shift['end']):
-                        if i in slot_counts:
-                            slot_counts[i] += 1
+                for person_name, person_data in self.schedule[day].items():
+                    for shift_code in person_data['shifts']:
+                        shift_counts[shift_code] += 1
 
-            # Draw time labels and warnings
-            for i, time in enumerate(self.timeslots[:-1]):
-                time_y = content_start_y + (i * slot_height)
+            # Draw shift times and warnings
+            y_offset = content_start_y
+            for shift_code in self.timeslot_codes:
+                shift_info = self.shift_definitions[shift_code]
 
                 # Time label
-                draw.text((time_x, time_y), time, fill=text_muted, font=small_font)
+                draw.text((time_x, y_offset), shift_info['start'], fill=text_muted, font=small_font)
 
                 # Warning if understaffed
-                if slot_counts[i] < desks:
-                    warning_text = f"⚠ {slot_counts[i]}/{desks}"
-                    draw.text((time_x + 50, time_y), warning_text, fill=error, font=small_font)
+                if shift_counts[shift_code] < desks:
+                    warning_text = f"⚠{shift_counts[shift_code]}/{desks}"
+                    draw.text((time_x + 45, y_offset), warning_text, fill=error, font=small_font)
+
+                y_offset += shift_heights[shift_code]
 
             # Draw schedule blocks
             if day in self.schedule:
-                # Calculate available width for blocks (from after warnings to right edge)
-                blocks_start_x = time_x + 100
-                available_width = day_width - (blocks_start_x - x) - 10  # 10px right margin
+                blocks_start_x = time_x + 90
+                available_width = day_width - (blocks_start_x - x) - 10
                 block_width = available_width // desks if desks > 0 else available_width
 
-                lanes = [[] for _ in range(desks)]
+                # Track lane assignments
+                shift_lanes = {code: [] for code in self.timeslot_codes}
 
                 people_shifts = list(self.schedule[day].items())
-                people_shifts.sort(key=lambda x: (x[1]['start'], x[1]['end']))
+                people_shifts.sort(key=lambda x: x[1]['shifts'])
 
-                for person_name, shift in people_shifts:
-                    start_idx = shift['start']
-                    end_idx = shift['end']
-                    is_short = shift.get('is_short', False)
+                for person_name, person_data in people_shifts:
+                    shifts = person_data['shifts']
 
-                    # Find available lane
+                    # Find a lane that's free for all required shifts
                     assigned_lane = None
                     for lane_idx in range(desks):
-                        overlaps = False
-                        for existing_start, existing_end in lanes[lane_idx]:
-                            if not (end_idx <= existing_start or start_idx >= existing_end):
-                                overlaps = True
-                                break
-                        if not overlaps:
+                        lane_is_free = all(
+                            lane_idx >= len(shift_lanes[shift_code]) or
+                            shift_lanes[shift_code][lane_idx] is None
+                            for shift_code in shifts
+                        )
+
+                        if lane_is_free:
                             assigned_lane = lane_idx
-                            lanes[lane_idx].append((start_idx, end_idx))
+                            for shift_code in shifts:
+                                while len(shift_lanes[shift_code]) <= lane_idx:
+                                    shift_lanes[shift_code].append(None)
+                                shift_lanes[shift_code][lane_idx] = person_name
                             break
 
                     if assigned_lane is None:
                         assigned_lane = 0
 
-                    # Calculate position
-                    block_x1 = blocks_start_x + (assigned_lane * block_width) + 2
-                    block_y1 = content_start_y + (start_idx * slot_height) + 2
-                    block_x2 = blocks_start_x + ((assigned_lane + 1) * block_width) - 2
-                    block_y2 = content_start_y + (end_idx * slot_height) - 2
+                    # Draw blocks for each shift
+                    y_offset = content_start_y
+                    for shift_code in self.timeslot_codes:
+                        if shift_code in shifts:
+                            shift_info = self.shift_definitions[shift_code]
 
-                    # Get color
-                    color = self.person_colors.get(person_name, accent)
+                            # Calculate position
+                            y1 = y_offset + 2
+                            y2 = y_offset + shift_heights[shift_code] - 2
+                            x1 = blocks_start_x + (assigned_lane * block_width) + 2
+                            x2 = blocks_start_x + ((assigned_lane + 1) * block_width) - 2
 
-                    # Draw block
-                    draw.rectangle([block_x1, block_y1, block_x2, block_y2],
-                                  fill=color, outline=border, width=2)
+                            # Get color
+                            color = self.person_colors.get(person_name, accent)
 
-                    # Draw name and times (four lines: Name, start, -, end)
-                    display_name = self.get_display_name(person_name)
-                    if is_short:
-                        display_name += " ⚠"
+                            # Draw block
+                            draw.rectangle([x1, y1, x2, y2],
+                                          fill=color, outline=border, width=2)
 
-                    # Get start and end times
-                    start_time = self.timeslots[start_idx]
-                    end_time = self.timeslots[end_idx]
+                            # Draw name (simplified for space)
+                            display_name = self.get_display_name(person_name)
+                            center_x = x1 + (x2 - x1) // 2
+                            center_y = y1 + (y2 - y1) // 2
 
-                    # Calculate available width for text
-                    text_available_width = block_x2 - block_x1 - 8  # 4px padding each side
-                    block_height = block_y2 - block_y1
+                            # Check text width and truncate if needed
+                            text_bbox = draw.textbbox((0, 0), display_name, font=small_font)
+                            text_width = text_bbox[2] - text_bbox[0]
+                            available_width = x2 - x1 - 10
 
-                    # Try different font sizes to fit the text
-                    current_font = small_font
-                    time_font_size = 8
-                    try:
-                        time_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", time_font_size)
-                    except:
-                        time_font = ImageFont.load_default()
+                            if text_width > available_width:
+                                max_chars = int(available_width / (text_width / len(display_name))) - 3
+                                if max_chars > 0:
+                                    display_name = display_name[:max_chars] + "..."
 
-                    # Check if name fits
-                    text_bbox = draw.textbbox((0, 0), display_name, font=current_font)
-                    text_width = text_bbox[2] - text_bbox[0]
+                            name_bbox = draw.textbbox((0, 0), display_name, font=small_font)
+                            name_width = name_bbox[2] - name_bbox[0]
+                            draw.text((center_x - name_width // 2, center_y - 5),
+                                     display_name, fill=bg_dark, font=small_font)
 
-                    # If name doesn't fit, try smaller font
-                    if text_width > text_available_width:
-                        try:
-                            tiny_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 7)
-                        except:
-                            tiny_font = ImageFont.load_default()
-
-                        text_bbox = draw.textbbox((0, 0), display_name, font=tiny_font)
-                        text_width = text_bbox[2] - text_bbox[0]
-
-                        if text_width <= text_available_width:
-                            current_font = tiny_font
-                        else:
-                            # If still doesn't fit, truncate
-                            char_width = text_width / len(display_name) if len(display_name) > 0 else 5
-                            max_chars = int(text_available_width / char_width) - 3
-                            if max_chars > 0:
-                                display_name = display_name[:max_chars] + "..."
-                            current_font = tiny_font
-
-                    # Calculate vertical positions for four lines (close together, at top)
-                    center_x = block_x1 + (block_x2 - block_x1) // 2
-
-                    # Use tight spacing matching the display function
-                    # Font size is 9 for small_font, so line_spacing = 9 - 1 = 8
-                    line_spacing = 8  # Tight spacing to match display
-
-                    # Start from top of block with small padding
-                    start_y_pos = block_y1 + 8
-                    name_y = start_y_pos
-                    time1_y = name_y + line_spacing + 3  # Extra 3px spacing after name
-                    dash_y = time1_y + line_spacing
-                    time2_y = dash_y + line_spacing
-
-                    # Draw name (centered)
-                    name_bbox = draw.textbbox((0, 0), display_name, font=current_font)
-                    name_width = name_bbox[2] - name_bbox[0]
-                    draw.text((center_x - name_width // 2, name_y), display_name, fill=bg_dark, font=current_font)
-
-                    # Draw start time (centered)
-                    start_bbox = draw.textbbox((0, 0), start_time, font=time_font)
-                    start_width = start_bbox[2] - start_bbox[0]
-                    draw.text((center_x - start_width // 2, time1_y), start_time, fill=bg_dark, font=time_font)
-
-                    # Draw dash (centered)
-                    dash_bbox = draw.textbbox((0, 0), "-", font=time_font)
-                    dash_width = dash_bbox[2] - dash_bbox[0]
-                    draw.text((center_x - dash_width // 2, dash_y), "-", fill=bg_dark, font=time_font)
-
-                    # Draw end time (centered)
-                    end_bbox = draw.textbbox((0, 0), end_time, font=time_font)
-                    end_width = end_bbox[2] - end_bbox[0]
-                    draw.text((center_x - end_width // 2, time2_y), end_time, fill=bg_dark, font=time_font)
+                        y_offset += shift_heights[shift_code]
 
         # Hours section (right side)
-        hours_x = 1040  # Moved right to accommodate wider schedule
+        hours_x = 760
         hours_y = 70
-        hours_width = 520
+        hours_width = 500
 
         # Draw hours border
-        draw.rectangle([hours_x, hours_y, hours_x + hours_width, schedule_y + day_height * 2 + 20],
+        draw.rectangle([hours_x, hours_y, hours_x + hours_width, hours_y + 800],
                       outline=border, width=2)
 
         # Draw title
         draw.text((hours_x + 20, hours_y + 15), "Hours Scheduled",
                  fill=accent, font=header_font)
 
-        # Draw headers (only Name and Scheduled)
+        # Draw headers
         header_y = hours_y + 50
         headers = ["Name", "Scheduled"]
         header_x_positions = [hours_x + 20, hours_x + 350]
@@ -826,7 +826,7 @@ class SchedulingTool:
             draw.rectangle([hours_x + 10, y, hours_x + 15, y + 15],
                           fill=person_color)
 
-            # Draw data (name and scheduled hours in neutral grey)
+            # Draw data
             draw.text((header_x_positions[0], y), name, fill=text_primary, font=small_font)
             draw.text((header_x_positions[1], y), f"{scheduled:.1f}h", fill=text_muted, font=small_font)
 
@@ -918,18 +918,18 @@ class SchedulingTool:
         self.generate_person_colors()
 
         # Initialize schedule and hours
-        # Schedule: {day: {person_name: [shift_codes]} }
+        # Schedule: {day: {person_name: {'shifts': [shift_codes], 'hours': float}} }
         self.schedule = {day: {} for day in self.day_names}
         self.hours_scheduled = {person['name']: 0 for person in self.people}
 
-        # For algorithm: track shifts per slot per day: {day: {shift_code: [people]}}
+        # For algorithm: track shifts per shift code per day: {day: {shift_code: [people]}}
         self.temp_schedule = {day: {code: [] for code in self.timeslot_codes} for day in self.day_names}
 
         # Run scheduling algorithm with per-day desks, rigidity, and target hours
         self.run_scheduling_algorithm(self.desks_per_day, rigidity, total_hours_target)
 
         # Convert temp_schedule to person-centric schedule
-        self.convert_to_person_schedule(min_shift)
+        self.convert_to_person_schedule()
 
         # Mark as generated
         self.schedule_generated = True
@@ -938,68 +938,65 @@ class SchedulingTool:
         self.display_schedule()
         self.display_hours()
 
-    def convert_to_person_schedule(self, min_shift):
-        """Convert slot-based schedule to person-based blocks"""
+    def convert_to_person_schedule(self):
+        """Convert shift-code-based schedule to person-based schedule with shift grouping"""
         for day in self.day_names:
             person_shifts = {}
 
-            # Find continuous blocks for each person
+            # Find all shifts for each person
             for person in self.people:
                 person_name = person['name']
-                person_slots = []
+                shifts_assigned = []
 
-                # Find all slots this person is scheduled
-                for slot_idx in range(len(self.timeslots) - 1):
-                    if person_name in self.temp_schedule[day][slot_idx]:
-                        person_slots.append(slot_idx)
+                # Find all shift codes this person is scheduled for
+                for shift_code in self.timeslot_codes:
+                    if person_name in self.temp_schedule[day][shift_code]:
+                        shifts_assigned.append(shift_code)
 
-                # If person has slots, create a block
-                if person_slots:
-                    start = min(person_slots)
-                    end = max(person_slots) + 1
-                    hours = sum(0.5 if i == 6 else 1 for i in person_slots)
-                    is_short = hours < min_shift
+                # If person has shifts, create entry
+                if shifts_assigned:
+                    # Calculate total hours
+                    total_hours = sum(self.shift_definitions[code]['hours'] for code in shifts_assigned)
 
                     person_shifts[person_name] = {
-                        'start': start,
-                        'end': end,
-                        'hours': hours,
-                        'is_short': is_short
+                        'shifts': shifts_assigned,
+                        'hours': total_hours
                     }
 
             self.schedule[day] = person_shifts
 
-    def run_scheduling_algorithm(self, desks_per_day, min_shift, total_hours_target):
+    def run_scheduling_algorithm(self, desks_per_day, rigidity, total_hours_target):
         """
-        New Priority-Based Scheduling Algorithm:
+        Priority-Based Scheduling Algorithm with Fixed Shifts:
+
         HARD CONSTRAINTS:
-        1. Never exceed desk capacity per timeslot (ABSOLUTE HARD LIMIT)
+        1. Never exceed desk capacity per shift (ABSOLUTE HARD LIMIT)
         2. Never schedule someone for over their max hours (ABSOLUTE HARD LIMIT)
+        3. Respect mandatory break 12:45-13:15 (no one works both 1030 and 1315 without splitting)
 
         PRIORITIES:
         1. Schedule everyone with nonzero preferred hours
         2. Get everyone to their preferred hours (can exceed total target for this)
         3. Try to meet or exceed total hours target
-        4. Preferably adhere to minimum shift length
-        5. When needed, use agreed hours (if agreed > preferred)
-        6. Last resort: use max hours
+        4. Respect rigidity parameter for shift combinations
+        5. Prefer 2+ hour shifts (but allow shorter if needed)
         """
 
-        # Track timeslot filling for balance
-        timeslot_counts = {day: {i: 0 for i in range(len(self.timeslots) - 1)} for day in self.day_names}
+        # Track shift filling for balance
+        shift_counts = {day: {code: 0 for code in self.timeslot_codes} for day in self.day_names}
 
         # Get people with nonzero preferred hours
         people_to_schedule = [p for p in self.people if p['preferred_hours'] > 0]
 
-        # Phase 1: Give everyone at least one shift
+        # Phase 1: Give everyone at least one shift combination
         for person in people_to_schedule:
             if self.hours_scheduled[person['name']] == 0:
-                shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'initial')
-                if shift:
-                    self.assign_shift_to_person(person, shift, timeslot_counts)
+                shift_combo = self.find_best_available_shift_combo(
+                    person, desks_per_day, rigidity, shift_counts, 'initial')
+                if shift_combo:
+                    self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
 
         # Phase 2: AGGRESSIVELY fill everyone to their preferred hours
-        # Keep iterating until no one can get closer to preferred
         max_iterations = 100
         iteration = 0
 
@@ -1014,12 +1011,12 @@ class SchedulingTool:
 
                 # Try to get closer to preferred hours
                 if self.hours_scheduled[person['name']] < person['preferred_hours']:
-                    shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'preferred')
-                    if shift:
-                        self.assign_shift_to_person(person, shift, timeslot_counts)
+                    shift_combo = self.find_best_available_shift_combo(
+                        person, desks_per_day, rigidity, shift_counts, 'preferred')
+                    if shift_combo:
+                        self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
                         progress_made = True
 
-            # If no progress made, we can't get anyone closer to preferred
             if not progress_made:
                 break
 
@@ -1032,26 +1029,25 @@ class SchedulingTool:
                 iteration += 1
                 progress_made = False
 
-                # Try agreed hours tier for people below agreed
                 for person in sorted(people_to_schedule,
                                    key=lambda p: p['agreed_hours'] - self.hours_scheduled[p['name']],
                                    reverse=True):
 
                     if self.hours_scheduled[person['name']] < person['agreed_hours']:
-                        shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'agreed')
-                        if shift:
-                            self.assign_shift_to_person(person, shift, timeslot_counts)
+                        shift_combo = self.find_best_available_shift_combo(
+                            person, desks_per_day, rigidity, shift_counts, 'agreed')
+                        if shift_combo:
+                            self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
                             total_scheduled = sum(self.hours_scheduled.values())
                             progress_made = True
 
-                            # Check if we've reached target
                             if total_scheduled >= total_hours_target:
                                 break
 
                 if not progress_made or total_scheduled >= total_hours_target:
                     break
 
-        # Phase 4: If still under target, use max hours tier as last resort
+        # Phase 4: If still under target, use max hours tier
         if total_scheduled < total_hours_target:
             iteration = 0
             while total_scheduled < total_hours_target and iteration < max_iterations:
@@ -1063,9 +1059,10 @@ class SchedulingTool:
                                    reverse=True):
 
                     if self.hours_scheduled[person['name']] < person['max_hours']:
-                        shift = self.find_best_available_shift(person, desks_per_day, min_shift, timeslot_counts, 'max')
-                        if shift:
-                            self.assign_shift_to_person(person, shift, timeslot_counts)
+                        shift_combo = self.find_best_available_shift_combo(
+                            person, desks_per_day, rigidity, shift_counts, 'max')
+                        if shift_combo:
+                            self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
                             total_scheduled = sum(self.hours_scheduled.values())
                             progress_made = True
 
@@ -1075,17 +1072,18 @@ class SchedulingTool:
                 if not progress_made or total_scheduled >= total_hours_target:
                     break
 
-        # Phase 5: Last resort - allow multiple shifts per day if needed for target
-        if total_scheduled < total_hours_target:
-            self.fill_remaining_gaps_aggressively(desks_per_day, min_shift, timeslot_counts, total_hours_target)
+    def find_best_available_shift_combo(self, person, desks_per_day, rigidity, shift_counts, mode):
+        """
+        Find the best available shift combination for a person based on rigidity
 
-    def find_best_available_shift(self, person, desks_per_day, min_shift, timeslot_counts, mode):
+        Shift combinations by rigidity level:
+        - High (70-100): Prefer full morning (0930+1030) or full afternoon (1315+1530)
+        - Medium (30-70): Allow 1030+1315 (with mandatory break)
+        - Low (0-30): Allow individual shifts, including short ones
+
+        2-hour minimum: Only enforce when rigidity is medium/high
         """
-        Find the best available shift for a person
-        Mode: 'initial', 'preferred', 'agreed', 'max' - determines budget checking
-        Priority: least-filled timeslots for balanced distribution
-        """
-        best_shift = None
+        best_combo = None
         best_score = float('inf')
 
         # Determine hours budget based on mode
@@ -1099,228 +1097,134 @@ class SchedulingTool:
         else:
             hours_budget = person['max_hours'] - current_hours
 
-        # Never exceed max hours (Priority #2)
+        # Never exceed max hours
         hours_budget = min(hours_budget, person['max_hours'] - current_hours)
 
         if hours_budget <= 0:
             return None
 
+        # Define possible shift combinations by rigidity
+        if rigidity >= 70:
+            # High rigidity: Prefer full morning or full afternoon
+            combo_priorities = [
+                ['0930', '1030'],  # Full morning (3.25h)
+                ['1315', '1530'],  # Full afternoon (3.75h)
+                ['1030'],          # Mid-morning only (2.25h)
+                ['1315'],          # Mid-afternoon only (2.25h)
+                ['1530'],          # Late afternoon (1.5h)
+                ['0930'],          # Early morning (1h) - last resort
+            ]
+        elif rigidity >= 30:
+            # Medium rigidity: Allow cross-break combinations
+            combo_priorities = [
+                ['0930', '1030'],  # Full morning (3.25h)
+                ['1315', '1530'],  # Full afternoon (3.75h)
+                ['1030', '1315'],  # Cross break (4.5h) - requires split
+                ['1030'],          # Mid-morning only (2.25h)
+                ['1315'],          # Mid-afternoon only (2.25h)
+                ['1530'],          # Late afternoon (1.5h)
+                ['0930'],          # Early morning (1h)
+            ]
+        else:
+            # Low rigidity: Allow all combinations including single short shifts
+            combo_priorities = [
+                ['1030', '1315'],  # Cross break (4.5h)
+                ['0930', '1030'],  # Full morning (3.25h)
+                ['1315', '1530'],  # Full afternoon (3.75h)
+                ['1030'],          # Mid-morning only (2.25h)
+                ['1315'],          # Mid-afternoon only (2.25h)
+                ['1530'],          # Late afternoon (1.5h)
+                ['0930'],          # Early morning (1h)
+            ]
+
+        # Try each day
         for day_idx, day in enumerate(self.day_names):
             day_code = self.days[day_idx]
             desks = desks_per_day[day]
 
-            # Get available slots for this person
-            if person['availability'].get(day_code, {}).get('whole_day', False):
-                available_slots = list(range(len(self.timeslots) - 1))
-            else:
-                available_slots = []
-                for idx in range(len(self.timeslots) - 1):
-                    slot_time = self.timeslots[idx]
-                    if person['availability'].get(day_code, {}).get(slot_time, False):
-                        available_slots.append(idx)
-
-            if not available_slots:
+            # Check if person is already scheduled on this day
+            person_already_scheduled = any(
+                person['name'] in self.temp_schedule[day][code]
+                for code in self.timeslot_codes
+            )
+            # Allow multiple shifts per day only in later phases
+            if person_already_scheduled and mode == 'initial':
                 continue
 
-            # Try to find continuous shifts
-            # Start with min_shift length, then try shorter if needed
-            for target_length in sorted([min_shift] + list(range(1, min_shift)), reverse=True):
-                for start_idx in available_slots:
-                    # Calculate how many slots we can actually use
-                    max_possible_length = min(
-                        target_length,
-                        len(self.timeslots) - 1 - start_idx
-                    )
+            # Try each shift combination in priority order
+            for shift_codes in combo_priorities:
+                # Calculate total hours for this combination
+                combo_hours = sum(self.shift_definitions[code]['hours'] for code in shift_codes)
 
-                    for length in range(max_possible_length, 0, -1):
-                        shift_slots = list(range(start_idx, start_idx + length))
+                # Check if within budget
+                if combo_hours > hours_budget:
+                    continue
 
-                        # Check if all slots are available for this person
-                        if not all(idx in available_slots for idx in shift_slots):
-                            continue
+                # Check if person is available for all shifts in combo
+                all_available = True
+                for shift_code in shift_codes:
+                    if not person['availability'].get(day_code, {}).get(shift_code, False):
+                        all_available = False
+                        break
 
-                        # CRITICAL: Check if person is already in any of these specific slots (prevent overlaps)
-                        already_in_slots = any(
-                            person['name'] in self.temp_schedule[day][idx]
-                            for idx in shift_slots
-                        )
-                        if already_in_slots:
-                            continue
+                if not all_available:
+                    continue
 
-                        # Check if all slots have room (desk capacity constraint)
-                        all_have_room = all(
-                            len(self.temp_schedule[day][idx]) < desks
-                            for idx in shift_slots
-                        )
-                        if not all_have_room:
-                            continue
+                # Check if person already in any of these shifts (prevent overlaps)
+                already_in_shifts = any(
+                    person['name'] in self.temp_schedule[day][code]
+                    for code in shift_codes
+                )
+                if already_in_shifts:
+                    continue
 
-                        # Calculate shift hours (0.5 for last slot if it's slot 6, else 1)
-                        shift_hours = sum(0.5 if idx == 6 else 1 for idx in shift_slots)
+                # Check if all shifts have desk capacity
+                all_have_room = all(
+                    len(self.temp_schedule[day][code]) < desks
+                    for code in shift_codes
+                )
+                if not all_have_room:
+                    continue
 
-                        # Check if within budget
-                        if shift_hours > hours_budget:
-                            continue
+                # Calculate score - prefer balanced distribution and longer shifts
+                total_fill = sum(shift_counts[day][code] for code in shift_codes)
+                avg_fill = total_fill / len(shift_codes) if shift_codes else 0
 
-                        # Calculate score - slightly prefer least-filled slots but not critical
-                        total_fill = sum(timeslot_counts[day][idx] for idx in shift_slots)
-                        avg_fill = total_fill / len(shift_slots) if shift_slots else 0
+                # Prefer longer combinations (lower score is better)
+                length_bonus = -combo_hours * 2  # Prefer longer shifts
 
-                        # Prioritize meeting min_shift_length
-                        length_penalty = 0 if shift_hours >= min_shift else 100
+                # Balance score
+                score = avg_fill * 5 + length_bonus
 
-                        # Lower weight on distribution (10 vs 100) - allow uneven distribution
-                        score = avg_fill * 10 + length_penalty
+                if score < best_score:
+                    best_score = score
+                    best_combo = {
+                        'day': day,
+                        'shifts': shift_codes,
+                        'hours': combo_hours
+                    }
 
-                        if score < best_score:
-                            best_score = score
-                            best_shift = {
-                                'day': day,
-                                'slots': shift_slots,
-                                'hours': shift_hours
-                            }
+        return best_combo
 
-        return best_shift
+    def assign_shift_combo_to_person(self, person, shift_combo, shift_counts):
+        """Assign a shift combination to a person and update tracking"""
+        day = shift_combo['day']
+        shifts = shift_combo['shifts']
+        hours = shift_combo['hours']
 
-    def assign_shift_to_person(self, person, shift, timeslot_counts):
-        """Assign a shift to a person and update tracking"""
-        day = shift['day']
-        slots = shift['slots']
-        hours = shift['hours']
-
-        # Add person to each slot
-        for slot_idx in slots:
-            self.temp_schedule[day][slot_idx].append(person['name'])
-            timeslot_counts[day][slot_idx] += 1
+        # Add person to each shift
+        for shift_code in shifts:
+            self.temp_schedule[day][shift_code].append(person['name'])
+            shift_counts[day][shift_code] += 1
 
         # Update person's scheduled hours
         self.hours_scheduled[person['name']] += hours
 
-    def fill_remaining_gaps_aggressively(self, desks_per_day, min_shift, timeslot_counts, total_hours_target):
-        """
-        Last resort method to reach target hours
-        Removes the constraint of one shift per day - allows multiple days
-        """
-        total_scheduled = sum(self.hours_scheduled.values())
-        people_to_schedule = [p for p in self.people if p['preferred_hours'] > 0]
-
-        # Keep trying until we reach target or can't make progress
-        max_attempts = 200
-        attempt = 0
-
-        while total_scheduled < total_hours_target and attempt < max_attempts:
-            attempt += 1
-            progress_made = False
-
-            # Try to assign ANY shift to ANYONE who has hours budget
-            for person in sorted(people_to_schedule,
-                               key=lambda p: p['max_hours'] - self.hours_scheduled[p['name']],
-                               reverse=True):
-
-                if total_scheduled >= total_hours_target:
-                    break
-
-                # Skip if person is at max hours
-                if self.hours_scheduled[person['name']] >= person['max_hours']:
-                    continue
-
-                # Try to find ANY available shift on ANY day (even if already scheduled that day)
-                best_shift = self.find_any_available_shift_aggressive(person, desks_per_day, timeslot_counts)
-
-                if best_shift:
-                    self.assign_shift_to_person(person, best_shift, timeslot_counts)
-                    total_scheduled = sum(self.hours_scheduled.values())
-                    progress_made = True
-
-            if not progress_made:
-                break
-
-    def find_any_available_shift_aggressive(self, person, desks_per_day, timeslot_counts):
-        """
-        Find ANY available shift for a person, even on days they're already scheduled
-        This is a last resort to reach target hours
-        """
-        best_shift = None
-        best_score = float('inf')
-
-        current_hours = self.hours_scheduled[person['name']]
-        hours_budget = person['max_hours'] - current_hours
-
-        if hours_budget <= 0:
-            return None
-
-        for day_idx, day in enumerate(self.day_names):
-            day_code = self.days[day_idx]
-            desks = desks_per_day[day]
-
-            # Get available slots for this person
-            if person['availability'].get(day_code, {}).get('whole_day', False):
-                available_slots = list(range(len(self.timeslots) - 1))
-            else:
-                available_slots = []
-                for idx in range(len(self.timeslots) - 1):
-                    slot_time = self.timeslots[idx]
-                    if person['availability'].get(day_code, {}).get(slot_time, False):
-                        available_slots.append(idx)
-
-            if not available_slots:
-                continue
-
-            # Try to find continuous shifts - even short ones
-            for start_idx in available_slots:
-                for length in range(1, min(4, len(self.timeslots) - start_idx)):
-                    shift_slots = list(range(start_idx, start_idx + length))
-
-                    # Check if all slots are available for this person
-                    if not all(idx in available_slots for idx in shift_slots):
-                        continue
-
-                    # Check if all slots have room
-                    all_have_room = all(
-                        len(self.temp_schedule[day][idx]) < desks
-                        for idx in shift_slots
-                    )
-                    if not all_have_room:
-                        continue
-
-                    # Check if person is already in these specific slots
-                    already_in_slots = any(
-                        person['name'] in self.temp_schedule[day][idx]
-                        for idx in shift_slots
-                    )
-                    if already_in_slots:
-                        continue
-
-                    # Calculate shift hours
-                    shift_hours = sum(0.5 if idx == 6 else 1 for idx in shift_slots)
-
-                    # Check if within budget
-                    if shift_hours > hours_budget:
-                        continue
-
-                    # Calculate score - slightly prefer least-filled slots but not critical
-                    total_fill = sum(timeslot_counts[day][idx] for idx in shift_slots)
-                    avg_fill = total_fill / len(shift_slots) if shift_slots else 0
-
-                    # Lower weight on distribution - allow uneven distribution
-                    score = avg_fill * 10
-
-                    if score < best_score:
-                        best_score = score
-                        best_shift = {
-                            'day': day,
-                            'slots': shift_slots,
-                            'hours': shift_hours
-                        }
-
-        return best_shift
 
     def display_schedule(self):
         # Clear previous display
         for widget in self.schedule_frame.winfo_children():
             widget.destroy()
-
-        min_shift = int(self.min_shift_length.get())
 
         # Main container
         main_container = tk.Frame(self.schedule_frame, bg=self.colors['bg_dark'])
@@ -1335,29 +1239,62 @@ class SchedulingTool:
                             pady=15)
         week_info.pack(anchor=tk.W)
 
-        # 2x2 grid for days (more width per day)
-        days_grid = tk.Frame(main_container, bg=self.colors['bg_dark'])
-        days_grid.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        # Create vertical layout for 2 weeks
+        # Week 1 section
+        week1_label = tk.Label(main_container,
+                              text="Week 1",
+                              font=("Consolas", 12, "bold"),
+                              fg=self.colors['text_secondary'],
+                              bg=self.colors['bg_dark'],
+                              pady=10)
+        week1_label.pack(anchor=tk.W)
 
-        # Configure grid to expand equally
+        week1_grid = tk.Frame(main_container, bg=self.colors['bg_dark'])
+        week1_grid.pack(fill=tk.BOTH, expand=True, pady=(5, 20))
+
+        # Configure week 1 grid (2x2)
         for i in range(2):
-            days_grid.columnconfigure(i, weight=1)
-            days_grid.rowconfigure(i, weight=1)
+            week1_grid.columnconfigure(i, weight=1)
+            week1_grid.rowconfigure(i, weight=1)
 
-        # Create each day block in 2x2 grid
+        # Week 1 days (indices 0-3)
         grid_positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
+        for i in range(4):
+            day = self.day_names[i]
+            row, col = grid_positions[i]
+            desks = self.desks_per_day[day]
+            self.create_day_block(week1_grid, day, i, desks, row, col)
 
-        for day_idx, day in enumerate(self.day_names):
-            row, col = grid_positions[day_idx]
-            desks = self.desks_per_day[day]  # Get desk count for this specific day
-            self.create_day_block(days_grid, day, day_idx, desks, min_shift, row, col)
+        # Week 2 section
+        week2_label = tk.Label(main_container,
+                              text="Week 2",
+                              font=("Consolas", 12, "bold"),
+                              fg=self.colors['text_secondary'],
+                              bg=self.colors['bg_dark'],
+                              pady=10)
+        week2_label.pack(anchor=tk.W)
+
+        week2_grid = tk.Frame(main_container, bg=self.colors['bg_dark'])
+        week2_grid.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+
+        # Configure week 2 grid (2x2)
+        for i in range(2):
+            week2_grid.columnconfigure(i, weight=1)
+            week2_grid.rowconfigure(i, weight=1)
+
+        # Week 2 days (indices 4-7)
+        for i in range(4):
+            day = self.day_names[i + 4]
+            row, col = grid_positions[i]
+            desks = self.desks_per_day[day]
+            self.create_day_block(week2_grid, day, i + 4, desks, row, col)
 
         # Update canvas size to fit content
         self.schedule_frame.update_idletasks()
         self.update_schedule_canvas_size()
 
-    def create_day_block(self, parent, day, day_idx, desks, min_shift, row, col):
-        """Create a single day schedule block"""
+    def create_day_block(self, parent, day, day_idx, desks, row, col):
+        """Create a single day schedule block using shift codes"""
         # Day container with rounded appearance
         day_container = tk.Frame(parent, bg=self.colors['bg_dark'])
         day_container.grid(row=row, column=col, sticky=(tk.W, tk.E, tk.N, tk.S),
@@ -1378,25 +1315,32 @@ class SchedulingTool:
         schedule_grid = tk.Frame(day_container, bg=self.colors['bg_dark'])
         schedule_grid.pack(fill=tk.BOTH, expand=True)
 
-        # Create canvas with reduced height
-        SLOT_HEIGHT = 45  # Reduced from ~64 to 45 pixels per slot
-        canvas_height = len(self.timeslots[:-1]) * SLOT_HEIGHT
+        # Calculate heights for each shift
+        shift_heights = {
+            "0930": 40,   # 1h shift
+            "1030": 90,   # 2.25h shift
+            "1315": 90,   # 2.25h shift
+            "1530": 60    # 1.5h shift
+        }
+        total_height = sum(shift_heights.values())
 
         # Time column - use Canvas for exact positioning
-        time_canvas = tk.Canvas(schedule_grid, width=60, height=canvas_height,
+        time_canvas = tk.Canvas(schedule_grid, width=60, height=total_height,
                                bg=self.colors['bg_dark'], highlightthickness=0)
         time_canvas.grid(row=0, column=0, sticky=(tk.N, tk.S), padx=(0, 5))
 
-        # Add time labels aligned with grid lines
-        for i, time in enumerate(self.timeslots[:-1]):
-            y_pos = i * SLOT_HEIGHT + 5  # Position at top of each slot with small offset
-            time_canvas.create_text(55, y_pos, text=time,
+        # Add time labels for each shift
+        y_offset = 0
+        for shift_code in self.timeslot_codes:
+            shift_info = self.shift_definitions[shift_code]
+            time_canvas.create_text(55, y_offset + 5, text=shift_info['start'],
                                    font=("Consolas", 9),
                                    fill=self.colors['text_muted'],
                                    anchor=tk.E)
+            y_offset += shift_heights[shift_code]
 
         # Warning column - use Canvas for exact positioning
-        warning_canvas = tk.Canvas(schedule_grid, width=50, height=canvas_height,
+        warning_canvas = tk.Canvas(schedule_grid, width=50, height=total_height,
                                   bg=self.colors['bg_dark'], highlightthickness=0)
         warning_canvas.grid(row=0, column=1, sticky=(tk.N, tk.S), padx=(0, 5))
 
@@ -1406,29 +1350,30 @@ class SchedulingTool:
         schedule_grid.columnconfigure(2, weight=1)
 
         day_canvas = tk.Canvas(canvas_frame,
-                              height=canvas_height,
+                              height=total_height,
                               bg=self.colors['bg_dark'],
                               highlightthickness=1,
                               highlightbackground=self.colors['border'])
         day_canvas.pack(fill=tk.BOTH, expand=True)
 
-        # Count capacity and add warnings
-        slot_counts = {i: 0 for i in range(len(self.timeslots) - 1)}
+        # Count capacity and add warnings for each shift
+        shift_counts = {code: 0 for code in self.timeslot_codes}
 
         if day in self.schedule:
-            for person_name, shift in self.schedule[day].items():
-                for i in range(shift['start'], shift['end']):
-                    if i in slot_counts:
-                        slot_counts[i] += 1
+            for person_name, person_data in self.schedule[day].items():
+                for shift_code in person_data['shifts']:
+                    shift_counts[shift_code] += 1
 
-        # Add warning labels aligned with grid lines
-        for i in range(len(self.timeslots) - 1):
-            if slot_counts[i] < desks:
-                y_pos = i * SLOT_HEIGHT + 5  # Position at top of each slot with small offset
-                warning_canvas.create_text(5, y_pos, text=f"⚠ {slot_counts[i]}/{desks}",
+        # Add warning labels for understaffed shifts
+        y_offset = 0
+        for shift_code in self.timeslot_codes:
+            if shift_counts[shift_code] < desks:
+                warning_canvas.create_text(5, y_offset + 5,
+                                         text=f"⚠ {shift_counts[shift_code]}/{desks}",
                                          font=("Consolas", 8),
                                          fill=self.colors['error'],
                                          anchor=tk.W)
+            y_offset += shift_heights[shift_code]
 
         # Update canvas when it's sized
         def draw_schedule(event=None):
@@ -1438,134 +1383,139 @@ class SchedulingTool:
 
             day_canvas.delete("all")
 
-            # Draw time grid lines
-            for i in range(len(self.timeslots)):
-                y = i * SLOT_HEIGHT
-                day_canvas.create_line(0, y, canvas_width, y,
+            # Draw grid lines between shifts
+            y_offset = 0
+            for shift_code in self.timeslot_codes:
+                day_canvas.create_line(0, y_offset, canvas_width, y_offset,
                                       fill=self.colors['border'],
                                       width=1)
+                y_offset += shift_heights[shift_code]
+            # Bottom line
+            day_canvas.create_line(0, y_offset, canvas_width, y_offset,
+                                  fill=self.colors['border'],
+                                  width=1)
 
             # Draw schedule blocks
             if day in self.schedule:
                 # Calculate block width
                 block_width = (canvas_width - 10) / desks
 
-                # Track lane assignments: {lane: [(start, end), ...]}
-                lanes = [[] for _ in range(desks)]
+                # Track lane assignments for each shift: {shift_code: [person_names]}
+                shift_lanes = {code: [] for code in self.timeslot_codes}
 
+                # Assign people to lanes
                 people_shifts = list(self.schedule[day].items())
-                people_shifts.sort(key=lambda x: (x[1]['start'], x[1]['end']))
+                people_shifts.sort(key=lambda x: x[1]['shifts'])
 
-                for person_name, shift in people_shifts:
-                    start_idx = shift['start']
-                    end_idx = shift['end']
-                    is_short = shift.get('is_short', False)
+                for person_name, person_data in people_shifts:
+                    shifts = person_data['shifts']
 
-                    # Find first available lane where this shift doesn't overlap
+                    # Find a lane that's free for ALL shifts this person needs
                     assigned_lane = None
                     for lane_idx in range(desks):
-                        # Check if this shift overlaps with any shift in this lane
-                        overlaps = False
-                        for existing_start, existing_end in lanes[lane_idx]:
-                            # Check for overlap: shifts overlap if one starts before the other ends
-                            if not (end_idx <= existing_start or start_idx >= existing_end):
-                                overlaps = True
-                                break
+                        # Check if this lane is free for all required shifts
+                        lane_is_free = all(
+                            lane_idx >= len(shift_lanes[shift_code]) or
+                            shift_lanes[shift_code][lane_idx] is None
+                            for shift_code in shifts
+                        )
 
-                        if not overlaps:
+                        if lane_is_free:
                             assigned_lane = lane_idx
-                            lanes[lane_idx].append((start_idx, end_idx))
+                            # Reserve this lane for all shifts
+                            for shift_code in shifts:
+                                # Extend the lane list if needed
+                                while len(shift_lanes[shift_code]) <= lane_idx:
+                                    shift_lanes[shift_code].append(None)
+                                shift_lanes[shift_code][lane_idx] = person_name
                             break
 
                     if assigned_lane is None:
-                        # Shouldn't happen if desk count is correct, but fallback to lane 0
                         assigned_lane = 0
 
-                    # Calculate position
-                    y1 = start_idx * SLOT_HEIGHT + 3
-                    y2 = end_idx * SLOT_HEIGHT - 3
-                    x1 = 5 + (assigned_lane * block_width)
-                    x2 = x1 + block_width - 5
+                    # Draw blocks for each shift this person has
+                    y_offset = 0
+                    for shift_code in self.timeslot_codes:
+                        if shift_code in shifts:
+                            shift_info = self.shift_definitions[shift_code]
 
-                    # Get color
-                    color = self.person_colors.get(person_name, self.colors['accent'])
+                            # Calculate position
+                            y1 = y_offset + 3
+                            y2 = y_offset + shift_heights[shift_code] - 3
+                            x1 = 5 + (assigned_lane * block_width)
+                            x2 = x1 + block_width - 5
 
-                    # Draw rounded rectangle with rounded border
-                    radius = 8
-                    self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
-                                          fill=color, outline=self.colors['border'], width=2)
+                            # Get color
+                            color = self.person_colors.get(person_name, self.colors['accent'])
 
-                    # Add name and times (four lines: Name, start, -, end)
-                    display_name = self.get_display_name(person_name)
-                    if is_short:
-                        display_name += " ⚠"
+                            # Draw rounded rectangle
+                            radius = 8
+                            self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
+                                                  fill=color, outline=self.colors['border'], width=2)
 
-                    # Get start and end times
-                    start_time = self.timeslots[start_idx]
-                    end_time = self.timeslots[end_idx]
+                            # Add name and times for this shift
+                            display_name = self.get_display_name(person_name)
 
-                    # Calculate available width
-                    available_width = x2 - x1 - 10  # 5px padding on each side
-                    block_height = y2 - y1
+                            # Calculate available width
+                            available_width = x2 - x1 - 10
+                            block_height = y2 - y1
 
-                    # Try different font sizes to fit the text
-                    font_size = 9
-                    font = ("Consolas", font_size, "bold")
-                    time_font = ("Consolas", font_size - 1)
+                            # Font sizes
+                            font_size = 9
+                            font = ("Consolas", font_size, "bold")
+                            time_font = ("Consolas", font_size - 1)
 
-                    # Estimate text width for the longest line
-                    longest_text = max([display_name, start_time, end_time], key=len)
-                    estimated_width = len(longest_text) * (font_size * 0.6)
+                            # Estimate text width
+                            longest_text = max([display_name, shift_info['start'], shift_info['end']], key=len)
+                            estimated_width = len(longest_text) * (font_size * 0.6)
 
-                    # Reduce font size if text is too wide
-                    while estimated_width > available_width and font_size > 6:
-                        font_size -= 1
-                        font = ("Consolas", font_size, "bold")
-                        time_font = ("Consolas", max(6, font_size - 1))
-                        longest_text = max([display_name, start_time, end_time], key=len)
-                        estimated_width = len(longest_text) * (font_size * 0.6)
+                            # Reduce font size if needed
+                            while estimated_width > available_width and font_size > 6:
+                                font_size -= 1
+                                font = ("Consolas", font_size, "bold")
+                                time_font = ("Consolas", max(6, font_size - 1))
+                                longest_text = max([display_name, shift_info['start'], shift_info['end']], key=len)
+                                estimated_width = len(longest_text) * (font_size * 0.6)
 
-                    # If still too wide, truncate name with ellipsis
-                    final_name = display_name
-                    if len(display_name) * (font_size * 0.6) > available_width:
-                        max_chars = int(available_width / (font_size * 0.6)) - 3
-                        if max_chars > 0:
-                            final_name = display_name[:max_chars] + "..."
+                            # Truncate name if still too wide
+                            final_name = display_name
+                            if len(display_name) * (font_size * 0.6) > available_width:
+                                max_chars = int(available_width / (font_size * 0.6)) - 3
+                                if max_chars > 0:
+                                    final_name = display_name[:max_chars] + "..."
 
-                    # Calculate vertical positions for four lines (close together, at top)
-                    center_x = (x1 + x2) / 2
-                    line_spacing = font_size - 1  # Tight spacing
+                            # Calculate vertical positions
+                            center_x = (x1 + x2) / 2
+                            line_spacing = font_size - 1
 
-                    # Start from top of block with small padding
-                    start_y = y1 + 8
-                    name_y = start_y
-                    time1_y = name_y + line_spacing + 3  # Extra 3px spacing after name
-                    dash_y = time1_y + line_spacing
-                    time2_y = dash_y + line_spacing
+                            start_y = y1 + 8
+                            name_y = start_y
+                            time1_y = name_y + line_spacing + 3
+                            dash_y = time1_y + line_spacing
+                            time2_y = dash_y + line_spacing
 
-                    # Draw name
-                    day_canvas.create_text(center_x, name_y,
-                                          text=final_name,
-                                          fill=self.colors['bg_dark'],
-                                          font=font)
+                            # Draw text
+                            day_canvas.create_text(center_x, name_y,
+                                                  text=final_name,
+                                                  fill=self.colors['bg_dark'],
+                                                  font=font)
 
-                    # Draw start time
-                    day_canvas.create_text(center_x, time1_y,
-                                          text=start_time,
-                                          fill=self.colors['bg_dark'],
-                                          font=time_font)
+                            day_canvas.create_text(center_x, time1_y,
+                                                  text=shift_info['start'],
+                                                  fill=self.colors['bg_dark'],
+                                                  font=time_font)
 
-                    # Draw dash
-                    day_canvas.create_text(center_x, dash_y,
-                                          text="-",
-                                          fill=self.colors['bg_dark'],
-                                          font=time_font)
+                            day_canvas.create_text(center_x, dash_y,
+                                                  text="-",
+                                                  fill=self.colors['bg_dark'],
+                                                  font=time_font)
 
-                    # Draw end time
-                    day_canvas.create_text(center_x, time2_y,
-                                          text=end_time,
-                                          fill=self.colors['bg_dark'],
-                                          font=time_font)
+                            day_canvas.create_text(center_x, time2_y,
+                                                  text=shift_info['end'],
+                                                  fill=self.colors['bg_dark'],
+                                                  font=time_font)
+
+                        y_offset += shift_heights[shift_code]
 
         day_canvas.bind('<Configure>', draw_schedule)
         day_canvas.after(100, draw_schedule)
