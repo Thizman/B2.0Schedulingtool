@@ -318,7 +318,7 @@ class SchedulingTool:
                                    orient=tk.HORIZONTAL, variable=self.weekly_variance,
                                    bg=self.colors['bg_light'], fg=self.colors['text_primary'],
                                    highlightthickness=0, troughcolor=self.colors['bg_medium'],
-                                   length=150, width=15, showvalue=0)
+                                   length=200, width=15, showvalue=0)
         variance_slider.pack(side=tk.LEFT, padx=5)
 
         tk.Label(variance_frame, text="2h",
@@ -561,15 +561,23 @@ class SchedulingTool:
             return "Invalid week number"
 
     def export_csv(self):
-        """Export the schedule as a CSV file"""
+        """Export the schedule as a CSV file with grouped dates"""
         if not self.schedule_generated:
             messagebox.showwarning("Warning", "Please generate a schedule first")
             return
 
         try:
-            # Get week info for filename
+            # Get week info for filename and dates
             week_num = int(self.week_number.get())
             filename = f"B2.0 Schedule week {week_num}.csv"
+            year = datetime.now().year
+
+            # Calculate dates for each day
+            jan_1 = datetime(year, 1, 1)
+            days_to_monday = (7 - jan_1.weekday()) % 7
+            if days_to_monday == 0 and jan_1.weekday() != 0:
+                days_to_monday = 7
+            first_monday = jan_1 + timedelta(days=days_to_monday)
 
             # Ask user where to save
             file_path = filedialog.asksaveasfilename(
@@ -581,28 +589,67 @@ class SchedulingTool:
             if not file_path:
                 return
 
-            # Create CSV
+            # Create CSV with new format
             with open(file_path, 'w', newline='') as f:
                 writer = csv.writer(f)
 
                 # Write header
-                writer.writerow(['Name', 'Day', 'Shifts', 'Hours'])
+                writer.writerow(['Date', 'Person', 'Shift Hours', 'Hours'])
 
-                # Write schedule data
-                for day in self.day_names:
-                    if day in self.schedule:
-                        for person_name, person_data in sorted(self.schedule[day].items()):
-                            shifts = person_data['shifts']
-                            hours = person_data['hours']
+                # Process each day
+                for day_idx, day in enumerate(self.day_names):
+                    if day in self.schedule and self.schedule[day]:
+                        # Calculate the actual date for this day
+                        # Week 1 days: 0-3, Week 2 days: 4-7
+                        week_offset = (week_num - 1) * 7
+                        if day_idx < 4:
+                            # Week 1 (Mon-Thu)
+                            day_offset = day_idx
+                        else:
+                            # Week 2 (Mon-Thu of next week)
+                            day_offset = day_idx + 3  # Skip Fri, Sat, Sun
 
-                            # Format shifts as time ranges
-                            shift_ranges = []
-                            for shift_code in shifts:
-                                shift_info = self.shift_definitions[shift_code]
-                                shift_ranges.append(f"{shift_info['start']}-{shift_info['end']}")
+                        current_date = first_monday + timedelta(weeks=(week_num - 1), days=day_offset)
+                        date_str = current_date.strftime('%A %d %b').lower()
 
-                            shifts_str = ', '.join(shift_ranges)
-                            writer.writerow([person_name, day, shifts_str, f"{hours:.2f}"])
+                        # Get all people scheduled this day, sorted by name
+                        people_this_day = sorted(self.schedule[day].items())
+
+                        # Write first person with date
+                        if people_this_day:
+                            first_person = True
+                            for person_name, person_data in people_this_day:
+                                shifts = person_data['shifts']
+                                hours = person_data['hours']
+
+                                # Format shift times with break notation
+                                morning_shifts = [s for s in shifts if s in ['0930', '1030']]
+                                afternoon_shifts = [s for s in shifts if s in ['1315', '1530']]
+
+                                shift_parts = []
+                                if morning_shifts:
+                                    start = self.shift_definitions[morning_shifts[0]]['start']
+                                    end = self.shift_definitions[morning_shifts[-1]]['end']
+                                    shift_parts.append(f"{start}-{end}")
+
+                                if afternoon_shifts:
+                                    start = self.shift_definitions[afternoon_shifts[0]]['start']
+                                    end = self.shift_definitions[afternoon_shifts[-1]]['end']
+                                    shift_parts.append(f"{start}-{end}")
+
+                                shifts_str = ', '.join(shift_parts)
+
+                                # Format hours as hours:minutes
+                                hours_int = int(hours)
+                                minutes = int((hours - hours_int) * 60)
+                                hours_str = f"{hours_int}:{minutes:02d}"
+
+                                # Write row (date only for first person)
+                                if first_person:
+                                    writer.writerow([date_str, person_name, shifts_str, hours_str])
+                                    first_person = False
+                                else:
+                                    writer.writerow(['', person_name, shifts_str, hours_str])
 
             messagebox.showinfo("Success", f"Schedule exported to:\n{file_path}")
 
@@ -1829,7 +1876,35 @@ class SchedulingTool:
         week2_total = sum(hours_per_week[p['name']]['week2'] for p in self.people)
         total_scheduled = week1_total + week2_total
 
-        # Total label
+        # Week 1 Total
+        week1_label = tk.Label(container, text="Week 1 Total:",
+                              font=("Consolas", 10, "bold"),
+                              fg=self.colors['text_secondary'],
+                              bg=self.colors['bg_dark'])
+        week1_label.grid(row=current_row, column=0, padx=(10, 15), pady=4, sticky=tk.W)
+
+        week1_value = tk.Label(container, text=f"{week1_total:.1f}h",
+                              font=("Consolas", 10, "bold"),
+                              fg=self.colors['text_secondary'],
+                              bg=self.colors['bg_dark'])
+        week1_value.grid(row=current_row, column=1, padx=15, pady=4, sticky=tk.W)
+        current_row += 1
+
+        # Week 2 Total
+        week2_label = tk.Label(container, text="Week 2 Total:",
+                              font=("Consolas", 10, "bold"),
+                              fg=self.colors['text_secondary'],
+                              bg=self.colors['bg_dark'])
+        week2_label.grid(row=current_row, column=0, padx=(10, 15), pady=4, sticky=tk.W)
+
+        week2_value = tk.Label(container, text=f"{week2_total:.1f}h",
+                              font=("Consolas", 10, "bold"),
+                              fg=self.colors['text_secondary'],
+                              bg=self.colors['bg_dark'])
+        week2_value.grid(row=current_row, column=1, padx=15, pady=4, sticky=tk.W)
+        current_row += 1
+
+        # Total (2 Weeks)
         total_label = tk.Label(container, text="Total (2 Weeks):",
                               font=("Consolas", 11, "bold"),
                               fg=self.colors['accent'],

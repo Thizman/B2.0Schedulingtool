@@ -66,7 +66,9 @@ def create_csv(filename, preferred_hours_list):
 
         # Write student data
         for i, name in enumerate(names):
-            preferred = preferred_hours_list[i]
+            preferred_per_week = preferred_hours_list[i]
+            # Convert to 2-week total (multiply by 2)
+            preferred = preferred_per_week * 2
             # Agreed hours: slightly higher than preferred (add 0-4 hours)
             agreed = preferred + random.choice([0, 2, 2, 4])
             # Max hours: higher than agreed (add 2-6 hours)
