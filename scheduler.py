@@ -107,6 +107,7 @@ class SchedulingTool:
         self.desks_w2 = tk.StringVar(value="8")
         self.desks_th2 = tk.StringVar(value="8")
         self.rigidity = tk.IntVar(value=50)  # Slider 0-100 for shift preference rigidity
+        self.weekly_variance = tk.IntVar(value=1)  # Slider 0-2 for weekly hour variance tolerance
         self.total_hours_target = tk.StringVar(value="270")  # 2 weeks = 135*2
 
         self.setup_styles()
@@ -221,13 +222,13 @@ class SchedulingTool:
         config_container = tk.Frame(parent, bg=self.colors['bg_dark'])
         config_container.grid(row=0, column=0, sticky=tk.W, pady=(10, 10), padx=10)
 
-        # Canvas for rounded border (increased size to fit all inputs including 2 weeks)
-        canvas = tk.Canvas(config_container, width=700, height=450,
+        # Canvas for rounded border (increased size to fit all inputs including 2 weeks and variance slider)
+        canvas = tk.Canvas(config_container, width=700, height=480,
                           bg=self.colors['bg_dark'], highlightthickness=0)
         canvas.pack()
 
         # Draw rounded rectangle border
-        self.draw_rounded_rect(canvas, 2, 2, 698, 448, 10,
+        self.draw_rounded_rect(canvas, 2, 2, 698, 478, 10,
                               fill=self.colors['bg_dark'],
                               outline=self.colors['border'], width=2)
 
@@ -299,6 +300,32 @@ class SchedulingTool:
                 font=("Consolas", 8)).pack(side=tk.LEFT)
 
         ToolTip(rigidity_slider, "Low: Allow more 2-hour shifts\nHigh: Prefer full morning/afternoon shifts")
+
+        # Weekly variance slider
+        row_y += 1
+        tk.Label(config_frame, text="Weekly Hour Variance:",
+                bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=3)
+
+        variance_frame = tk.Frame(config_frame, bg=self.colors['bg_dark'])
+        variance_frame.grid(row=row_y, column=1, columnspan=3, sticky=tk.W, padx=5)
+
+        tk.Label(variance_frame, text="0h",
+                bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
+                font=("Consolas", 8)).pack(side=tk.LEFT)
+
+        variance_slider = tk.Scale(variance_frame, from_=0, to=2,
+                                   orient=tk.HORIZONTAL, variable=self.weekly_variance,
+                                   bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                                   highlightthickness=0, troughcolor=self.colors['bg_medium'],
+                                   length=150, width=15, showvalue=0)
+        variance_slider.pack(side=tk.LEFT, padx=5)
+
+        tk.Label(variance_frame, text="2h",
+                bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
+                font=("Consolas", 8)).pack(side=tk.LEFT)
+
+        ToolTip(variance_slider, "Allow weekly hour variation if compensated in other week\n0: Strict weekly balance\n2: Allow up to 2h variation per week")
 
         # Desks per day header
         row_y += 1
