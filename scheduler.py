@@ -73,23 +73,41 @@ class SchedulingTool:
         self.hours_scheduled = {}  # {person_name: hours}
         self.person_colors = {}  # {person_name: color}
 
-        # Timeslots (actual working hours 10:00-16:30)
+        # Timeslots (fixed shift times with mandatory break)
+        # Shifts: 9:30-10:30 (1h), 10:30-12:45 (2.25h), 13:15-15:30 (2.25h), 15:30-17:00 (1.5h)
+        # Mandatory break: 12:45-13:15 (0.5h)
         self.timeslots = [
-            "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "16:30"
+            "9:30", "10:30", "12:45", "13:15", "15:30", "17:00"
         ]
-        self.timeslot_codes = ["1011", "1112", "1213", "1314", "1415", "1516", "1617"]
-        self.days = ["M", "TU", "W", "TH"]
-        self.day_names = ["Monday", "Tuesday", "Wednesday", "Thursday"]
+        self.timeslot_codes = ["0930", "1030", "1315", "1530"]  # Start time of each shift
+        self.shift_definitions = {
+            "0930": {"start": "9:30", "end": "10:30", "hours": 1.0},
+            "1030": {"start": "10:30", "end": "12:45", "hours": 2.25},
+            "1315": {"start": "13:15", "end": "15:30", "hours": 2.25},
+            "1530": {"start": "15:30", "end": "17:00", "hours": 1.5}
+        }
+
+        # 2 weeks = 8 days (Mon-Thu, Week 1 and Week 2)
+        self.days = ["M1", "TU1", "W1", "TH1", "M2", "TU2", "W2", "TH2"]
+        self.day_names = [
+            "Monday (Week 1)", "Tuesday (Week 1)", "Wednesday (Week 1)", "Thursday (Week 1)",
+            "Monday (Week 2)", "Tuesday (Week 2)", "Wednesday (Week 2)", "Thursday (Week 2)"
+        ]
 
         # Configuration variables
         self.csv_file_path = None
         self.week_number = tk.StringVar(value="1")
-        self.desks_monday = tk.StringVar(value="8")
-        self.desks_tuesday = tk.StringVar(value="8")
-        self.desks_wednesday = tk.StringVar(value="8")
-        self.desks_thursday = tk.StringVar(value="8")
-        self.min_shift_length = tk.StringVar(value="3")
-        self.total_hours_target = tk.StringVar(value="135")
+        # Desk configuration for 8 days (2 weeks)
+        self.desks_m1 = tk.StringVar(value="8")
+        self.desks_tu1 = tk.StringVar(value="8")
+        self.desks_w1 = tk.StringVar(value="8")
+        self.desks_th1 = tk.StringVar(value="8")
+        self.desks_m2 = tk.StringVar(value="8")
+        self.desks_tu2 = tk.StringVar(value="8")
+        self.desks_w2 = tk.StringVar(value="8")
+        self.desks_th2 = tk.StringVar(value="8")
+        self.rigidity = tk.IntVar(value=50)  # Slider 0-100 for shift preference rigidity
+        self.total_hours_target = tk.StringVar(value="270")  # 2 weeks = 135*2
 
         self.setup_styles()
         self.setup_ui()
@@ -203,13 +221,13 @@ class SchedulingTool:
         config_container = tk.Frame(parent, bg=self.colors['bg_dark'])
         config_container.grid(row=0, column=0, sticky=tk.W, pady=(10, 10), padx=10)
 
-        # Canvas for rounded border (increased size to fit all inputs)
-        canvas = tk.Canvas(config_container, width=700, height=280,
+        # Canvas for rounded border (increased size to fit all inputs including 2 weeks)
+        canvas = tk.Canvas(config_container, width=700, height=450,
                           bg=self.colors['bg_dark'], highlightthickness=0)
         canvas.pack()
 
         # Draw rounded rectangle border
-        self.draw_rounded_rect(canvas, 2, 2, 698, 278, 10,
+        self.draw_rounded_rect(canvas, 2, 2, 698, 448, 10,
                               fill=self.colors['bg_dark'],
                               outline=self.colors['border'], width=2)
 
@@ -256,35 +274,81 @@ class SchedulingTool:
                 insertbackground=self.colors['text_primary'],
                 font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y, column=3, sticky=tk.W, padx=5)
 
-        # Min shift length
+        # Rigidity slider
         row_y += 1
-        tk.Label(config_frame, text="Min Shift Length (hours):",
+        tk.Label(config_frame, text="Shift Preference Rigidity:",
                 bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
                 font=("Consolas", 9)).grid(row=row_y, column=0, sticky=tk.W, padx=5, pady=3)
-        tk.Entry(config_frame, textvariable=self.min_shift_length, width=8,
-                bg=self.colors['bg_light'], fg=self.colors['text_primary'],
-                insertbackground=self.colors['text_primary'],
-                font=("Consolas", 9), relief=tk.FLAT).grid(row=row_y, column=1, sticky=tk.W, padx=5)
+
+        rigidity_frame = tk.Frame(config_frame, bg=self.colors['bg_dark'])
+        rigidity_frame.grid(row=row_y, column=1, columnspan=3, sticky=tk.W, padx=5)
+
+        tk.Label(rigidity_frame, text="Flexible",
+                bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
+                font=("Consolas", 8)).pack(side=tk.LEFT)
+
+        rigidity_slider = tk.Scale(rigidity_frame, from_=0, to=100,
+                                   orient=tk.HORIZONTAL, variable=self.rigidity,
+                                   bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                                   highlightthickness=0, troughcolor=self.colors['bg_medium'],
+                                   length=200, width=15)
+        rigidity_slider.pack(side=tk.LEFT, padx=5)
+
+        tk.Label(rigidity_frame, text="Strict",
+                bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
+                font=("Consolas", 8)).pack(side=tk.LEFT)
+
+        ToolTip(rigidity_slider, "Low: Allow more 2-hour shifts\nHigh: Prefer full morning/afternoon shifts")
 
         # Desks per day header
         row_y += 1
-        tk.Label(config_frame, text="Desks Available Per Day:",
+        tk.Label(config_frame, text="Desks Available Per Day (2 Weeks):",
                 bg=self.colors['bg_dark'], fg=self.colors['accent'],
                 font=("Consolas", 9, "bold")).grid(row=row_y, column=0, columnspan=4, sticky=tk.W, padx=5, pady=(10, 3))
 
-        # Desks for each day in 2x2 grid
+        # Week 1 desks
         row_y += 1
-        desk_vars = [
-            ("Monday:", self.desks_monday),
-            ("Tuesday:", self.desks_tuesday),
-            ("Wednesday:", self.desks_wednesday),
-            ("Thursday:", self.desks_thursday)
+        tk.Label(config_frame, text="Week 1:",
+                bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
+                font=("Consolas", 8)).grid(row=row_y, column=0, columnspan=4, sticky=tk.W, padx=5, pady=3)
+        row_y += 1
+        desk_vars_w1 = [
+            ("Mon:", self.desks_m1),
+            ("Tue:", self.desks_tu1),
+            ("Wed:", self.desks_w1),
+            ("Thu:", self.desks_th1)
         ]
 
-        # Create 2x2 grid: row 0 = Monday, Tuesday; row 1 = Wednesday, Thursday
-        for i, (label, var) in enumerate(desk_vars):
-            grid_row = row_y + (i // 2)  # Row 0 for first 2, row 1 for last 2
-            grid_col = (i % 2) * 2  # Column 0 or 2 (label), then +1 for entry
+        # Create 2x2 grid for week 1
+        for i, (label, var) in enumerate(desk_vars_w1):
+            grid_row = row_y + (i // 2)
+            grid_col = (i % 2) * 2
+
+            tk.Label(config_frame, text=label,
+                    bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
+                    font=("Consolas", 9)).grid(row=grid_row, column=grid_col, sticky=tk.W, padx=5, pady=3)
+            tk.Entry(config_frame, textvariable=var, width=6,
+                    bg=self.colors['bg_light'], fg=self.colors['text_primary'],
+                    insertbackground=self.colors['text_primary'],
+                    font=("Consolas", 9), relief=tk.FLAT).grid(row=grid_row, column=grid_col+1, sticky=tk.W, padx=5)
+
+        # Week 2 desks
+        row_y += 2
+        tk.Label(config_frame, text="Week 2:",
+                bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
+                font=("Consolas", 8)).grid(row=row_y, column=0, columnspan=4, sticky=tk.W, padx=5, pady=3)
+        row_y += 1
+        desk_vars_w2 = [
+            ("Mon:", self.desks_m2),
+            ("Tue:", self.desks_tu2),
+            ("Wed:", self.desks_w2),
+            ("Thu:", self.desks_th2)
+        ]
+
+        # Create 2x2 grid for week 2
+        for i, (label, var) in enumerate(desk_vars_w2):
+            grid_row = row_y + (i // 2)
+            grid_col = (i % 2) * 2
 
             tk.Label(config_frame, text=label,
                     bg=self.colors['bg_dark'], fg=self.colors['text_primary'],
@@ -300,13 +364,21 @@ class SchedulingTool:
                            bg=self.colors['accent'], fg=self.colors['text_primary'],
                            font=("Consolas", 10, "bold"), relief=tk.FLAT,
                            padx=15, pady=6, cursor="hand2")
-        gen_btn.grid(row=row_y, column=0, columnspan=2, pady=10, sticky=tk.W)
+        gen_btn.grid(row=row_y, column=0, columnspan=4, pady=10, sticky=tk.W)
 
-        export_btn = tk.Button(config_frame, text="Export as PNG", command=self.export_schedule,
-                              bg=self.colors['success'], fg=self.colors['text_primary'],
-                              font=("Consolas", 10, "bold"), relief=tk.FLAT,
-                              padx=15, pady=6, cursor="hand2")
-        export_btn.grid(row=row_y, column=2, columnspan=2, pady=10, sticky=tk.W, padx=(15, 0))
+        # Export buttons on next row
+        row_y += 1
+        export_png_btn = tk.Button(config_frame, text="Export as PNG", command=self.export_schedule,
+                                   bg=self.colors['success'], fg=self.colors['text_primary'],
+                                   font=("Consolas", 9, "bold"), relief=tk.FLAT,
+                                   padx=12, pady=5, cursor="hand2")
+        export_png_btn.grid(row=row_y, column=0, columnspan=2, pady=5, sticky=tk.W)
+
+        export_csv_btn = tk.Button(config_frame, text="Export as CSV", command=self.export_csv,
+                                   bg=self.colors['success'], fg=self.colors['text_primary'],
+                                   font=("Consolas", 9, "bold"), relief=tk.FLAT,
+                                   padx=12, pady=5, cursor="hand2")
+        export_csv_btn.grid(row=row_y, column=2, columnspan=2, pady=5, sticky=tk.W, padx=(15, 0))
 
         # Hover effects for buttons
         def on_enter(e, btn, color):
@@ -318,8 +390,10 @@ class SchedulingTool:
         browse_btn.bind("<Leave>", lambda e: on_leave(e, browse_btn, self.colors['bg_light']))
         gen_btn.bind("<Enter>", lambda e: on_enter(e, gen_btn, self.colors['accent_hover']))
         gen_btn.bind("<Leave>", lambda e: on_leave(e, gen_btn, self.colors['accent']))
-        export_btn.bind("<Enter>", lambda e: on_enter(e, export_btn, '#6ec57e'))
-        export_btn.bind("<Leave>", lambda e: on_leave(e, export_btn, self.colors['success']))
+        export_png_btn.bind("<Enter>", lambda e: on_enter(e, export_png_btn, '#6ec57e'))
+        export_png_btn.bind("<Leave>", lambda e: on_leave(e, export_png_btn, self.colors['success']))
+        export_csv_btn.bind("<Enter>", lambda e: on_enter(e, export_csv_btn, '#6ec57e'))
+        export_csv_btn.bind("<Leave>", lambda e: on_leave(e, export_csv_btn, self.colors['success']))
 
 
     def setup_display_section(self, parent):
@@ -783,24 +857,21 @@ class SchedulingTool:
             for row in reader:
                 person = {
                     'name': row['name'],
-                    'agreed_hours': int(row['agreed hours per week']),
-                    'max_hours': int(row['max hours per week']),
-                    'preferred_hours': int(row['preferred hours per week']),
+                    # Hours are now for 2 weeks instead of 1 week
+                    'agreed_hours': int(row['agreed hours per 2 weeks']),
+                    'max_hours': int(row['max hours per 2 weeks']),
+                    'preferred_hours': int(row['preferred hours per 2 weeks']),
                     'availability': {}
                 }
 
-                # Parse availability columns
+                # Parse availability columns for each day and shift
                 for day_code in self.days:
                     person['availability'][day_code] = {}
-                    for i, slot_code in enumerate(self.timeslot_codes):
+                    for slot_code in self.timeslot_codes:
                         col_name = f"{day_code}{slot_code}"
                         if col_name in row:
-                            person['availability'][day_code][self.timeslots[i]] = row[col_name].lower() in ['true', '1', 'yes']
-
-                    # Whole day availability
-                    whole_day_col = f"{day_code}W"
-                    if whole_day_col in row:
-                        person['availability'][day_code]['whole_day'] = row[whole_day_col].lower() in ['true', '1', 'yes']
+                            # Store availability by shift code
+                            person['availability'][day_code][slot_code] = row[col_name].lower() in ['true', '1', 'yes']
 
                 self.people.append(person)
 
@@ -826,14 +897,18 @@ class SchedulingTool:
             return
 
         try:
-            # Parse per-day desks
+            # Parse per-day desks for 2 weeks (8 days)
             self.desks_per_day = {
-                'Monday': int(self.desks_monday.get()),
-                'Tuesday': int(self.desks_tuesday.get()),
-                'Wednesday': int(self.desks_wednesday.get()),
-                'Thursday': int(self.desks_thursday.get())
+                'Monday (Week 1)': int(self.desks_m1.get()),
+                'Tuesday (Week 1)': int(self.desks_tu1.get()),
+                'Wednesday (Week 1)': int(self.desks_w1.get()),
+                'Thursday (Week 1)': int(self.desks_th1.get()),
+                'Monday (Week 2)': int(self.desks_m2.get()),
+                'Tuesday (Week 2)': int(self.desks_tu2.get()),
+                'Wednesday (Week 2)': int(self.desks_w2.get()),
+                'Thursday (Week 2)': int(self.desks_th2.get())
             }
-            min_shift = int(self.min_shift_length.get())
+            rigidity = int(self.rigidity.get())
             total_hours_target = int(self.total_hours_target.get())
         except ValueError:
             messagebox.showerror("Error", "Please enter valid numbers for all configuration fields")
@@ -842,15 +917,16 @@ class SchedulingTool:
         # Generate colors for people
         self.generate_person_colors()
 
-        # Initialize schedule and hours (new structure: person-centric)
+        # Initialize schedule and hours
+        # Schedule: {day: {person_name: [shift_codes]} }
         self.schedule = {day: {} for day in self.day_names}
         self.hours_scheduled = {person['name']: 0 for person in self.people}
 
-        # For algorithm: track old style (slot: [people])
-        self.temp_schedule = {day: {i: [] for i in range(len(self.timeslots) - 1)} for day in self.day_names}
+        # For algorithm: track shifts per slot per day: {day: {shift_code: [people]}}
+        self.temp_schedule = {day: {code: [] for code in self.timeslot_codes} for day in self.day_names}
 
-        # Run scheduling algorithm with per-day desks and target hours
-        self.run_scheduling_algorithm(self.desks_per_day, min_shift, total_hours_target)
+        # Run scheduling algorithm with per-day desks, rigidity, and target hours
+        self.run_scheduling_algorithm(self.desks_per_day, rigidity, total_hours_target)
 
         # Convert temp_schedule to person-centric schedule
         self.convert_to_person_schedule(min_shift)
