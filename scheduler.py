@@ -291,7 +291,7 @@ class SchedulingTool:
                                    orient=tk.HORIZONTAL, variable=self.rigidity,
                                    bg=self.colors['bg_light'], fg=self.colors['text_primary'],
                                    highlightthickness=0, troughcolor=self.colors['bg_medium'],
-                                   length=200, width=15)
+                                   length=200, width=15, showvalue=0)
         rigidity_slider.pack(side=tk.LEFT, padx=5)
 
         tk.Label(rigidity_frame, text="Strict",
@@ -512,7 +512,7 @@ class SchedulingTool:
         placeholder.pack(expand=True)
 
     def get_week_display_text(self):
-        """Get formatted week display text"""
+        """Get formatted week display text for 2 weeks"""
         try:
             week_num = int(self.week_number.get())
             year = datetime.now().year
@@ -525,11 +525,11 @@ class SchedulingTool:
                 days_to_monday = 7
             first_monday = jan_1 + timedelta(days=days_to_monday)
 
-            # Calculate the start of the requested week
-            week_start = first_monday + timedelta(weeks=week_num - 1)
-            week_end = week_start + timedelta(days=3)  # Thursday
+            # Calculate the start of the requested week and the next week
+            week1_start = first_monday + timedelta(weeks=week_num - 1)
+            week2_end = week1_start + timedelta(days=10)  # End of second Thursday (2 weeks)
 
-            return f"Week {week_num}  •  {week_start.strftime('%B %d')} - {week_end.strftime('%B %d, %Y')}"
+            return f"Week {week_num} + {week_num + 1}  •  {week1_start.strftime('%B %d')} - {week2_end.strftime('%B %d, %Y')}"
         except ValueError:
             return "Invalid week number"
 
@@ -1104,6 +1104,7 @@ class SchedulingTool:
             return None
 
         # Define possible shift combinations by rigidity
+        # HARD CONSTRAINT: Minimum 2 hours per shift (no 1h or 1.5h shifts allowed)
         if rigidity >= 70:
             # High rigidity: Prefer full morning or full afternoon
             combo_priorities = [
@@ -1111,8 +1112,6 @@ class SchedulingTool:
                 ['1315', '1530'],  # Full afternoon (3.75h)
                 ['1030'],          # Mid-morning only (2.25h)
                 ['1315'],          # Mid-afternoon only (2.25h)
-                ['1530'],          # Late afternoon (1.5h)
-                ['0930'],          # Early morning (1h) - last resort
             ]
         elif rigidity >= 30:
             # Medium rigidity: Allow cross-break combinations
@@ -1122,19 +1121,15 @@ class SchedulingTool:
                 ['1030', '1315'],  # Cross break (4.5h) - requires split
                 ['1030'],          # Mid-morning only (2.25h)
                 ['1315'],          # Mid-afternoon only (2.25h)
-                ['1530'],          # Late afternoon (1.5h)
-                ['0930'],          # Early morning (1h)
             ]
         else:
-            # Low rigidity: Allow all combinations including single short shifts
+            # Low rigidity: Prioritize cross-break and individual 2h+ shifts
             combo_priorities = [
                 ['1030', '1315'],  # Cross break (4.5h)
                 ['0930', '1030'],  # Full morning (3.25h)
                 ['1315', '1530'],  # Full afternoon (3.75h)
                 ['1030'],          # Mid-morning only (2.25h)
                 ['1315'],          # Mid-afternoon only (2.25h)
-                ['1530'],          # Late afternoon (1.5h)
-                ['0930'],          # Early morning (1h)
             ]
 
         # Try each day
@@ -1433,89 +1428,112 @@ class SchedulingTool:
                     if assigned_lane is None:
                         assigned_lane = 0
 
-                    # Draw blocks for each shift this person has
-                    y_offset = 0
-                    for shift_code in self.timeslot_codes:
-                        if shift_code in shifts:
-                            shift_info = self.shift_definitions[shift_code]
+                    # Group consecutive shifts (split only on mandatory break at 12:45-13:15)
+                    # Morning shifts: 0930, 1030 (end at 12:45)
+                    # Afternoon shifts: 1315, 1530 (start at 13:15)
+                    shift_groups = []
+                    morning_shifts = [s for s in shifts if s in ['0930', '1030']]
+                    afternoon_shifts = [s for s in shifts if s in ['1315', '1530']]
 
-                            # Calculate position
-                            y1 = y_offset + 3
-                            y2 = y_offset + shift_heights[shift_code] - 3
-                            x1 = 5 + (assigned_lane * block_width)
-                            x2 = x1 + block_width - 5
+                    if morning_shifts:
+                        shift_groups.append(morning_shifts)
+                    if afternoon_shifts:
+                        shift_groups.append(afternoon_shifts)
 
-                            # Get color
-                            color = self.person_colors.get(person_name, self.colors['accent'])
+                    # Draw merged blocks for each group
+                    for shift_group in shift_groups:
+                        # Calculate merged block position
+                        first_shift = shift_group[0]
+                        last_shift = shift_group[-1]
 
-                            # Draw rounded rectangle
-                            radius = 8
-                            self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
-                                                  fill=color, outline=self.colors['border'], width=2)
+                        # Find y positions
+                        y1 = 3  # Start offset
+                        for code in self.timeslot_codes:
+                            if code == first_shift:
+                                break
+                            y1 += shift_heights[code]
 
-                            # Add name and times for this shift
-                            display_name = self.get_display_name(person_name)
+                        y2 = y1
+                        for shift_code in shift_group:
+                            y2 += shift_heights[shift_code]
+                        y2 -= 3  # End offset
 
-                            # Calculate available width
-                            available_width = x2 - x1 - 10
-                            block_height = y2 - y1
+                        # Calculate x position
+                        x1 = 5 + (assigned_lane * block_width)
+                        x2 = x1 + block_width - 5
 
-                            # Font sizes
-                            font_size = 9
+                        # Get color
+                        color = self.person_colors.get(person_name, self.colors['accent'])
+
+                        # Draw merged rounded rectangle
+                        radius = 8
+                        self.draw_rounded_rect(day_canvas, x1, y1, x2, y2, radius,
+                                              fill=color, outline=self.colors['border'], width=2)
+
+                        # Add name and times
+                        display_name = self.get_display_name(person_name)
+                        start_time = self.shift_definitions[first_shift]['start']
+                        end_time = self.shift_definitions[last_shift]['end']
+
+                        # Calculate available space
+                        available_width = x2 - x1 - 10
+                        block_height = y2 - y1
+
+                        # Font sizes
+                        font_size = 9
+                        font = ("Consolas", font_size, "bold")
+                        time_font = ("Consolas", font_size - 1)
+
+                        # Estimate text width
+                        longest_text = max([display_name, start_time, end_time], key=len)
+                        estimated_width = len(longest_text) * (font_size * 0.6)
+
+                        # Reduce font size if needed
+                        while estimated_width > available_width and font_size > 6:
+                            font_size -= 1
                             font = ("Consolas", font_size, "bold")
-                            time_font = ("Consolas", font_size - 1)
-
-                            # Estimate text width
-                            longest_text = max([display_name, shift_info['start'], shift_info['end']], key=len)
+                            time_font = ("Consolas", max(6, font_size - 1))
+                            longest_text = max([display_name, start_time, end_time], key=len)
                             estimated_width = len(longest_text) * (font_size * 0.6)
 
-                            # Reduce font size if needed
-                            while estimated_width > available_width and font_size > 6:
-                                font_size -= 1
-                                font = ("Consolas", font_size, "bold")
-                                time_font = ("Consolas", max(6, font_size - 1))
-                                longest_text = max([display_name, shift_info['start'], shift_info['end']], key=len)
-                                estimated_width = len(longest_text) * (font_size * 0.6)
+                        # Truncate name if still too wide
+                        final_name = display_name
+                        if len(display_name) * (font_size * 0.6) > available_width:
+                            max_chars = int(available_width / (font_size * 0.6)) - 3
+                            if max_chars > 0:
+                                final_name = display_name[:max_chars] + "..."
 
-                            # Truncate name if still too wide
-                            final_name = display_name
-                            if len(display_name) * (font_size * 0.6) > available_width:
-                                max_chars = int(available_width / (font_size * 0.6)) - 3
-                                if max_chars > 0:
-                                    final_name = display_name[:max_chars] + "..."
+                        # Calculate vertical positions
+                        center_x = (x1 + x2) / 2
+                        line_spacing = font_size - 1
 
-                            # Calculate vertical positions
-                            center_x = (x1 + x2) / 2
-                            line_spacing = font_size - 1
+                        start_y = y1 + 8
+                        name_y = start_y
+                        time1_y = name_y + line_spacing + 3
+                        dash_y = time1_y + line_spacing
+                        time2_y = dash_y + line_spacing
 
-                            start_y = y1 + 8
-                            name_y = start_y
-                            time1_y = name_y + line_spacing + 3
-                            dash_y = time1_y + line_spacing
-                            time2_y = dash_y + line_spacing
+                        # Draw text
+                        day_canvas.create_text(center_x, name_y,
+                                              text=final_name,
+                                              fill=self.colors['bg_dark'],
+                                              font=font)
 
-                            # Draw text
-                            day_canvas.create_text(center_x, name_y,
-                                                  text=final_name,
-                                                  fill=self.colors['bg_dark'],
-                                                  font=font)
+                        day_canvas.create_text(center_x, time1_y,
+                                              text=start_time,
+                                              fill=self.colors['bg_dark'],
+                                              font=time_font)
 
-                            day_canvas.create_text(center_x, time1_y,
-                                                  text=shift_info['start'],
-                                                  fill=self.colors['bg_dark'],
-                                                  font=time_font)
+                        day_canvas.create_text(center_x, dash_y,
+                                              text="-",
+                                              fill=self.colors['bg_dark'],
+                                              font=time_font)
 
-                            day_canvas.create_text(center_x, dash_y,
-                                                  text="-",
-                                                  fill=self.colors['bg_dark'],
-                                                  font=time_font)
+                        day_canvas.create_text(center_x, time2_y,
+                                              text=end_time,
+                                              fill=self.colors['bg_dark'],
+                                              font=time_font)
 
-                            day_canvas.create_text(center_x, time2_y,
-                                                  text=shift_info['end'],
-                                                  fill=self.colors['bg_dark'],
-                                                  font=time_font)
-
-                        y_offset += shift_heights[shift_code]
 
         day_canvas.bind('<Configure>', draw_schedule)
         day_canvas.after(100, draw_schedule)
@@ -1566,33 +1584,62 @@ class SchedulingTool:
         for widget in self.hours_frame.winfo_children():
             widget.destroy()
 
+        # Calculate hours per week for each person
+        week1_days = self.day_names[:4]  # Monday-Thursday Week 1
+        week2_days = self.day_names[4:]  # Monday-Thursday Week 2
+
+        hours_per_week = {}
+        for person in self.people:
+            name = person['name']
+            week1_hours = 0
+            week2_hours = 0
+
+            for day in week1_days:
+                if day in self.schedule and name in self.schedule[day]:
+                    week1_hours += self.schedule[day][name]['hours']
+
+            for day in week2_days:
+                if day in self.schedule and name in self.schedule[day]:
+                    week2_hours += self.schedule[day][name]['hours']
+
+            hours_per_week[name] = {'week1': week1_hours, 'week2': week2_hours}
+
         # Create styled container
         container = tk.Frame(self.hours_frame, bg=self.colors['bg_dark'])
         container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-        # Create headers
+        # Week 1 Section
+        week1_title = tk.Label(container, text="Week 1 Hours",
+                              font=("Consolas", 12, "bold"),
+                              fg=self.colors['accent'],
+                              bg=self.colors['bg_dark'])
+        week1_title.grid(row=0, column=0, columnspan=5, sticky=tk.W, pady=(0, 10))
+
+        # Week 1 headers
         headers = ["Name", "Scheduled", "Preferred", "Agreed", "Max"]
         for col, header in enumerate(headers):
             header_label = tk.Label(container, text=header,
-                                   font=("Consolas", 11, "bold"),
-                                   fg=self.colors['accent'],
+                                   font=("Consolas", 10, "bold"),
+                                   fg=self.colors['text_secondary'],
                                    bg=self.colors['bg_dark'])
-            header_label.grid(row=0, column=col, padx=15, pady=10, sticky=tk.W)
+            header_label.grid(row=1, column=col, padx=15, pady=5, sticky=tk.W)
 
-        # Add separator
-        separator = tk.Frame(container, height=2, bg=self.colors['border'])
-        separator.grid(row=1, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(0, 10))
+        # Week 1 separator
+        separator1 = tk.Frame(container, height=1, bg=self.colors['border'])
+        separator1.grid(row=2, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(0, 5))
 
         # Sort people by name
         sorted_people = sorted(self.people, key=lambda p: p['name'])
 
-        # Display each person's hours
-        for row, person in enumerate(sorted_people, start=2):
+        # Display Week 1 hours
+        current_row = 3
+        for person in sorted_people:
             name = person['name']
-            scheduled = self.hours_scheduled[name]
-            preferred = person['preferred_hours']
-            agreed = person['agreed_hours']
-            max_hours = person['max_hours']
+            scheduled = hours_per_week[name]['week1']
+            # Week hours are half of 2-week totals
+            preferred = person['preferred_hours'] / 2
+            agreed = person['agreed_hours'] / 2
+            max_hours = person['max_hours'] / 2
 
             # Color code based on hours
             if scheduled < agreed:
@@ -1607,52 +1654,126 @@ class SchedulingTool:
 
             # Color indicator
             color_box = tk.Frame(container, width=4, height=20, bg=person_color)
-            color_box.grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+            color_box.grid(row=current_row, column=0, sticky=tk.W, padx=(0, 5))
 
             # Name
             name_label = tk.Label(container, text=name,
                                  font=("Consolas", 10),
                                  fg=self.colors['text_primary'],
                                  bg=self.colors['bg_dark'])
-            name_label.grid(row=row, column=0, padx=(10, 15), pady=4, sticky=tk.W)
+            name_label.grid(row=current_row, column=0, padx=(10, 15), pady=4, sticky=tk.W)
 
             # Scheduled hours (colored)
             scheduled_label = tk.Label(container, text=f"{scheduled:.1f}h",
                                       font=("Consolas", 10, "bold"),
                                       fg=color,
                                       bg=self.colors['bg_dark'])
-            scheduled_label.grid(row=row, column=1, padx=15, pady=4, sticky=tk.W)
+            scheduled_label.grid(row=current_row, column=1, padx=15, pady=4, sticky=tk.W)
 
             # Other hours
             for col, hours in enumerate([preferred, agreed, max_hours], start=2):
-                label = tk.Label(container, text=f"{hours}h",
+                label = tk.Label(container, text=f"{hours:.1f}h",
                                font=("Consolas", 10),
                                fg=self.colors['text_secondary'],
                                bg=self.colors['bg_dark'])
-                label.grid(row=row, column=col, padx=15, pady=4, sticky=tk.W)
+                label.grid(row=current_row, column=col, padx=15, pady=4, sticky=tk.W)
 
-        # Add separator before total
-        total_row = len(sorted_people) + 2
-        separator2 = tk.Frame(container, height=2, bg=self.colors['border'])
-        separator2.grid(row=total_row, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(10, 10))
+            current_row += 1
 
-        # Add total hours row
-        total_row += 1
-        total_scheduled = sum(self.hours_scheduled.values())
+        # Week 2 Section (with spacing)
+        current_row += 2
+        week2_title = tk.Label(container, text="Week 2 Hours",
+                              font=("Consolas", 12, "bold"),
+                              fg=self.colors['accent'],
+                              bg=self.colors['bg_dark'])
+        week2_title.grid(row=current_row, column=0, columnspan=5, sticky=tk.W, pady=(10, 10))
+        current_row += 1
+
+        # Week 2 headers
+        for col, header in enumerate(headers):
+            header_label = tk.Label(container, text=header,
+                                   font=("Consolas", 10, "bold"),
+                                   fg=self.colors['text_secondary'],
+                                   bg=self.colors['bg_dark'])
+            header_label.grid(row=current_row, column=col, padx=15, pady=5, sticky=tk.W)
+        current_row += 1
+
+        # Week 2 separator
+        separator2 = tk.Frame(container, height=1, bg=self.colors['border'])
+        separator2.grid(row=current_row, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(0, 5))
+        current_row += 1
+
+        # Display Week 2 hours
+        for person in sorted_people:
+            name = person['name']
+            scheduled = hours_per_week[name]['week2']
+            # Week hours are half of 2-week totals
+            preferred = person['preferred_hours'] / 2
+            agreed = person['agreed_hours'] / 2
+            max_hours = person['max_hours'] / 2
+
+            # Color code based on hours
+            if scheduled < agreed:
+                color = self.colors['error']
+            elif scheduled < preferred:
+                color = self.colors['warning']
+            else:
+                color = self.colors['success']
+
+            # Get person's color for visual consistency
+            person_color = self.person_colors.get(name, self.colors['accent'])
+
+            # Color indicator
+            color_box = tk.Frame(container, width=4, height=20, bg=person_color)
+            color_box.grid(row=current_row, column=0, sticky=tk.W, padx=(0, 5))
+
+            # Name
+            name_label = tk.Label(container, text=name,
+                                 font=("Consolas", 10),
+                                 fg=self.colors['text_primary'],
+                                 bg=self.colors['bg_dark'])
+            name_label.grid(row=current_row, column=0, padx=(10, 15), pady=4, sticky=tk.W)
+
+            # Scheduled hours (colored)
+            scheduled_label = tk.Label(container, text=f"{scheduled:.1f}h",
+                                      font=("Consolas", 10, "bold"),
+                                      fg=color,
+                                      bg=self.colors['bg_dark'])
+            scheduled_label.grid(row=current_row, column=1, padx=15, pady=4, sticky=tk.W)
+
+            # Other hours
+            for col, hours in enumerate([preferred, agreed, max_hours], start=2):
+                label = tk.Label(container, text=f"{hours:.1f}h",
+                               font=("Consolas", 10),
+                               fg=self.colors['text_secondary'],
+                               bg=self.colors['bg_dark'])
+                label.grid(row=current_row, column=col, padx=15, pady=4, sticky=tk.W)
+
+            current_row += 1
+
+        # Total Hours Section
+        current_row += 1
+        separator3 = tk.Frame(container, height=2, bg=self.colors['border'])
+        separator3.grid(row=current_row, column=0, columnspan=5, sticky=(tk.W, tk.E), pady=(10, 10))
+        current_row += 1
+
+        week1_total = sum(hours_per_week[p['name']]['week1'] for p in self.people)
+        week2_total = sum(hours_per_week[p['name']]['week2'] for p in self.people)
+        total_scheduled = week1_total + week2_total
 
         # Total label
-        total_label = tk.Label(container, text="Total Hours:",
+        total_label = tk.Label(container, text="Total (2 Weeks):",
                               font=("Consolas", 11, "bold"),
                               fg=self.colors['accent'],
                               bg=self.colors['bg_dark'])
-        total_label.grid(row=total_row, column=0, padx=(10, 15), pady=8, sticky=tk.W)
+        total_label.grid(row=current_row, column=0, padx=(10, 15), pady=8, sticky=tk.W)
 
-        # Total hours value (in accent color)
+        # Total hours value
         total_value = tk.Label(container, text=f"{total_scheduled:.1f}h",
                               font=("Consolas", 10, "bold"),
                               fg=self.colors['accent_hover'],
                               bg=self.colors['bg_dark'])
-        total_value.grid(row=total_row, column=1, padx=15, pady=8, sticky=tk.W)
+        total_value.grid(row=current_row, column=1, padx=15, pady=8, sticky=tk.W)
 
         # Update canvas size to fit content
         self.hours_frame.update_idletasks()
