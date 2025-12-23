@@ -20,18 +20,31 @@ days = ["M1", "TU1", "W1", "TH1", "M2", "TU2", "W2", "TH2"]
 shifts = ["0930", "1030", "1315", "1530"]
 
 def generate_hours(mean, std_dev, num_students):
-    """Generate hours using approximation of normal distribution, rounded to nearest 2"""
+    """Generate hours using normal distribution, rounded to nearest 2"""
     import math
     hours = []
-    for _ in range(num_students):
+
+    # Generate twice as many samples to ensure good distribution
+    samples = []
+    for _ in range(num_students * 2):
         # Box-Muller transform for normal distribution
         u1 = random.random()
         u2 = random.random()
         z = math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
         h = mean + std_dev * z
-        # Round to nearest 2 and ensure minimum of 4 hours
-        h = max(4, round(h / 2) * 2)
-        hours.append(h)
+        # Round to nearest 2
+        h = round(h / 2) * 2
+        # Keep within reasonable bounds (at least 4, at most mean + 3*std_dev)
+        h = max(4, min(h, int(mean + 3 * std_dev)))
+        samples.append(h)
+
+    # Sort samples and pick evenly distributed ones to ensure good spread
+    samples.sort()
+    step = len(samples) / num_students
+    for i in range(num_students):
+        idx = int(i * step)
+        hours.append(samples[idx])
+
     return hours
 
 def generate_availability():

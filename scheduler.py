@@ -107,7 +107,7 @@ class SchedulingTool:
         self.desks_w2 = tk.StringVar(value="8")
         self.desks_th2 = tk.StringVar(value="8")
         self.rigidity = tk.IntVar(value=50)  # Slider 0-100 for shift preference rigidity
-        self.weekly_variance = tk.IntVar(value=1)  # Slider 0-2 for weekly hour variance tolerance
+        self.weekly_variance = tk.DoubleVar(value=1.0)  # Slider 0-2 (0.5h increments) for weekly hour variance tolerance
         self.total_hours_target = tk.StringVar(value="270")  # 2 weeks = 135*2
 
         self.setup_styles()
@@ -314,7 +314,7 @@ class SchedulingTool:
                 bg=self.colors['bg_dark'], fg=self.colors['text_secondary'],
                 font=("Consolas", 8)).pack(side=tk.LEFT)
 
-        variance_slider = tk.Scale(variance_frame, from_=0, to=2,
+        variance_slider = tk.Scale(variance_frame, from_=0, to=2, resolution=0.5,
                                    orient=tk.HORIZONTAL, variable=self.weekly_variance,
                                    bg=self.colors['bg_light'], fg=self.colors['text_primary'],
                                    highlightthickness=0, troughcolor=self.colors['bg_medium'],
@@ -936,6 +936,7 @@ class SchedulingTool:
                 'Thursday (Week 2)': int(self.desks_th2.get())
             }
             rigidity = int(self.rigidity.get())
+            weekly_variance = float(self.weekly_variance.get())
             total_hours_target = int(self.total_hours_target.get())
         except ValueError:
             messagebox.showerror("Error", "Please enter valid numbers for all configuration fields")
@@ -949,11 +950,15 @@ class SchedulingTool:
         self.schedule = {day: {} for day in self.day_names}
         self.hours_scheduled = {person['name']: 0 for person in self.people}
 
+        # Track hours per week for variance checking
+        self.week1_hours = {person['name']: 0 for person in self.people}
+        self.week2_hours = {person['name']: 0 for person in self.people}
+
         # For algorithm: track shifts per shift code per day: {day: {shift_code: [people]}}
         self.temp_schedule = {day: {code: [] for code in self.timeslot_codes} for day in self.day_names}
 
-        # Run scheduling algorithm with per-day desks, rigidity, and target hours
-        self.run_scheduling_algorithm(self.desks_per_day, rigidity, total_hours_target)
+        # Run scheduling algorithm with per-day desks, rigidity, weekly variance, and target hours
+        self.run_scheduling_algorithm(self.desks_per_day, rigidity, weekly_variance, total_hours_target)
 
         # Convert temp_schedule to person-centric schedule
         self.convert_to_person_schedule()
@@ -992,7 +997,7 @@ class SchedulingTool:
 
             self.schedule[day] = person_shifts
 
-    def run_scheduling_algorithm(self, desks_per_day, rigidity, total_hours_target):
+    def run_scheduling_algorithm(self, desks_per_day, rigidity, weekly_variance, total_hours_target):
         """
         Priority-Based Scheduling Algorithm with Fixed Shifts:
 
@@ -1000,6 +1005,7 @@ class SchedulingTool:
         1. Never exceed desk capacity per shift (ABSOLUTE HARD LIMIT)
         2. Never schedule someone for over their max hours (ABSOLUTE HARD LIMIT)
         3. Respect mandatory break 12:45-13:15 (no one works both 1030 and 1315 without splitting)
+        4. Weekly variance limit: |week_hours - preferred/2| <= weekly_variance (per week)
 
         PRIORITIES:
         1. Schedule everyone with nonzero preferred hours
@@ -1019,7 +1025,7 @@ class SchedulingTool:
         for person in people_to_schedule:
             if self.hours_scheduled[person['name']] == 0:
                 shift_combo = self.find_best_available_shift_combo(
-                    person, desks_per_day, rigidity, shift_counts, 'initial')
+                    person, desks_per_day, rigidity, shift_counts, 'initial', weekly_variance)
                 if shift_combo:
                     self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
 
@@ -1039,7 +1045,7 @@ class SchedulingTool:
                 # Try to get closer to preferred hours
                 if self.hours_scheduled[person['name']] < person['preferred_hours']:
                     shift_combo = self.find_best_available_shift_combo(
-                        person, desks_per_day, rigidity, shift_counts, 'preferred')
+                        person, desks_per_day, rigidity, shift_counts, 'preferred', weekly_variance)
                     if shift_combo:
                         self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
                         progress_made = True
@@ -1062,7 +1068,7 @@ class SchedulingTool:
 
                     if self.hours_scheduled[person['name']] < person['agreed_hours']:
                         shift_combo = self.find_best_available_shift_combo(
-                            person, desks_per_day, rigidity, shift_counts, 'agreed')
+                            person, desks_per_day, rigidity, shift_counts, 'agreed', weekly_variance)
                         if shift_combo:
                             self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
                             total_scheduled = sum(self.hours_scheduled.values())
@@ -1087,7 +1093,7 @@ class SchedulingTool:
 
                     if self.hours_scheduled[person['name']] < person['max_hours']:
                         shift_combo = self.find_best_available_shift_combo(
-                            person, desks_per_day, rigidity, shift_counts, 'max')
+                            person, desks_per_day, rigidity, shift_counts, 'max', weekly_variance)
                         if shift_combo:
                             self.assign_shift_combo_to_person(person, shift_combo, shift_counts)
                             total_scheduled = sum(self.hours_scheduled.values())
@@ -1099,7 +1105,7 @@ class SchedulingTool:
                 if not progress_made or total_scheduled >= total_hours_target:
                     break
 
-    def find_best_available_shift_combo(self, person, desks_per_day, rigidity, shift_counts, mode):
+    def find_best_available_shift_combo(self, person, desks_per_day, rigidity, shift_counts, mode, weekly_variance):
         """
         Find the best available shift combination for a person based on rigidity
 
@@ -1109,6 +1115,8 @@ class SchedulingTool:
         - Low (0-30): Allow individual shifts, including short ones
 
         2-hour minimum: Only enforce when rigidity is medium/high
+
+        Weekly variance: Enforce weekly hour distribution constraint
         """
         best_combo = None
         best_score = float('inf')
@@ -1208,6 +1216,28 @@ class SchedulingTool:
                 if not all_have_room:
                     continue
 
+                # Check weekly variance constraint
+                # Determine which week this day belongs to
+                # Week 1: days 0-3 (Monday-Thursday Week 1)
+                # Week 2: days 4-7 (Monday-Thursday Week 2)
+                week_idx = self.day_names.index(day)
+                is_week1 = week_idx < 4
+
+                # Get current week hours for this person
+                current_week_hours = self.week1_hours[person['name']] if is_week1 else self.week2_hours[person['name']]
+
+                # Calculate what total would be with this combo
+                potential_week_hours = current_week_hours + combo_hours
+
+                # Weekly target is half of preferred (preferred is for 2 weeks)
+                weekly_target = person['preferred_hours'] / 2
+
+                # Check if this would violate weekly variance constraint
+                # Allow deviation up to weekly_variance hours from the weekly target
+                if potential_week_hours > weekly_target + weekly_variance:
+                    # This combo would violate weekly variance, skip it
+                    continue
+
                 # Calculate score - prefer balanced distribution and longer shifts
                 total_fill = sum(shift_counts[day][code] for code in shift_codes)
                 avg_fill = total_fill / len(shift_codes) if shift_codes else 0
@@ -1241,6 +1271,17 @@ class SchedulingTool:
 
         # Update person's scheduled hours
         self.hours_scheduled[person['name']] += hours
+
+        # Update weekly hours tracking
+        # Week 1: day indices 0-3 (Monday-Thursday Week 1)
+        # Week 2: day indices 4-7 (Monday-Thursday Week 2)
+        week_idx = self.day_names.index(day)
+        if week_idx < 4:
+            # Week 1
+            self.week1_hours[person['name']] += hours
+        else:
+            # Week 2
+            self.week2_hours[person['name']] += hours
 
 
     def display_schedule(self):
