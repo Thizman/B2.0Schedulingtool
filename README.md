@@ -97,7 +97,8 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 1. **Open Command Prompt**
 
 2. **Install Pillow:**
-   ```py -m pip install Pillow
+   ```cmd
+   py -m pip install Pillow
    ```
 
 3. **Wait for installation to complete**
