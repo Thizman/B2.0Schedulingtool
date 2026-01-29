@@ -7,13 +7,8 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
   - [Windows](#windows-installation)
-  - [Linux/Ubuntu](#linuxubuntu-installation)
-  - [macOS](#macos-installation)
 - [Getting the Application](#getting-the-application)
 - [Setting Up the Application](#setting-up-the-application)
-- [Creating a Desktop Shortcut](#creating-a-desktop-shortcut)
-- [Usage Guide](#usage-guide)
-- [Sample Data](#sample-data)
 - [Troubleshooting](#troubleshooting)
 - [Application Features](#application-features)
 
