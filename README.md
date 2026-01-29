@@ -6,7 +6,6 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-  - [Windows](#windows-installation)
 - [Getting the Application](#getting-the-application)
 - [Setting Up the Application](#setting-up-the-application)
 - [Troubleshooting](#troubleshooting)
