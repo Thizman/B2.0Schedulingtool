@@ -140,44 +140,7 @@ Decide where you want to store the application. I recommend:
 
 ## Setting Up the Application
 
-### Step 1: Verify Files
-
-Make sure you have these files in your folder:
-- `scheduler.py` - Main application file
-- `calendar.ico` - Application icon
-- `run_scheduler.sh` - Linux launcher
-- `run_scheduler.bat` - Windows launcher
-- `run_scheduler_silent.vbs` - Windows silent launcher
-- `B2_Scheduler.desktop` - Linux desktop entry
-- Sample CSV files (sample_mean10_sd2.csv, etc.)
-
-### Step 2: Test the Application
-
-Let's make sure everything works before creating shortcuts.
-
-**Windows:**
-1. Open the file folder, right click an empty space in the folder and click "open in terminal"
-2. Run:
-   ```cmd
-   python scheduler.py
-   ```
-
-### Step 3: Test with Sample Data
-
-1. **In the application:**
-   - Click "Browse" next to "CSV File"
-   - Navigate to the application folder
-   - Select `sample_mean10_sd2.csv`
-   - Click "Open"
-
-2. **Generate a schedule:**
-   - Adjust settings if desired (or keep defaults)
-   - Click "Generate Schedule"
-   - You should see the schedule appear with colored blocks
-
-3. **Success!** Your application is working correctly.
-
----
+Follow this video tutorial: https://youtu.be/1OiDEePXTrs
 
 ## Troubleshooting
 
