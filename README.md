@@ -40,14 +40,13 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Python 3.6 or higher**
 2. **Git** (for downloading the application)
-3. **Visual Studio Code** (recommended code editor)
-4. **pip** (Python package manager - usually comes with Python)
-
+3. **pip** (Python package manager - usually comes with Python)
+4. (optional) A code editor of choice.
 ---
 
 ## Installation
 
-### Windows Installation
+### currently only explained for Windows installation
 
 #### Step 1: Install Python
 
@@ -104,121 +103,11 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 1. **Open Command Prompt**
 
 2. **Install Pillow:**
-   ```cmd
-   pip install pillow
+   ```py -m pip install Pillow
    ```
 
 3. **Wait for installation to complete**
    - You should see: "Successfully installed pillow-x.x.x"
-
----
-
-### Linux/Ubuntu Installation
-
-#### Step 1: Install Python and pip
-
-1. **Open Terminal** (Press `Ctrl + Alt + T`)
-
-2. **Update package list:**
-   ```bash
-   sudo apt update
-   ```
-
-3. **Install Python 3 and pip:**
-   ```bash
-   sudo apt install python3 python3-pip python3-tk
-   ```
-
-4. **Verify installation:**
-   ```bash
-   python3 --version
-   pip3 --version
-   ```
-
-#### Step 2: Install Git
-
-1. **In Terminal, run:**
-   ```bash
-   sudo apt install git
-   ```
-
-2. **Verify installation:**
-   ```bash
-   git --version
-   ```
-
-#### Step 3: Install Visual Studio Code (Optional)
-
-1. **Download VS Code:**
-   - Go to [code.visualstudio.com](https://code.visualstudio.com/)
-   - Click "Download for Linux" (.deb package for Ubuntu)
-
-2. **Install the package:**
-   ```bash
-   sudo dpkg -i ~/Downloads/code_*.deb
-   sudo apt install -f
-   ```
-
-#### Step 4: Install Pillow
-
-```bash
-pip3 install pillow
-```
-
----
-
-### macOS Installation
-
-#### Step 1: Install Homebrew (Package Manager)
-
-1. **Open Terminal** (Press `Cmd + Space`, type "Terminal", press Enter)
-
-2. **Install Homebrew:**
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-
-3. **Follow the on-screen instructions**
-
-#### Step 2: Install Python
-
-1. **In Terminal, run:**
-   ```bash
-   brew install python
-   ```
-
-2. **Verify installation:**
-   ```bash
-   python3 --version
-   ```
-
-#### Step 3: Install Git
-
-1. **In Terminal, run:**
-   ```bash
-   brew install git
-   ```
-
-2. **Verify installation:**
-   ```bash
-   git --version
-   ```
-
-#### Step 4: Install Visual Studio Code (Optional)
-
-1. **Download VS Code:**
-   - Go to [code.visualstudio.com](https://code.visualstudio.com/)
-   - Click "Download for macOS"
-
-2. **Install:**
-   - Open the downloaded .zip file
-   - Drag "Visual Studio Code" to Applications folder
-
-#### Step 5: Install Pillow
-
-```bash
-pip3 install pillow
-```
 
 ---
 
@@ -228,9 +117,8 @@ Now that you have all prerequisites installed, let's download the B2.0 Schedulin
 
 ### Step 1: Choose a Location
 
-Decide where you want to store the application. We recommend:
-- **Windows:** `C:\Users\YourName\Documents\B2.0Schedulingtool`
-- **Linux/Mac:** `~/Documents/B2.0Schedulingtool`
+Decide where you want to store the application. I recommend:
+-`C:\Users\YourName\Documents\SchedulingTool`
 
 ### Step 2: Clone the Repository
 
@@ -244,37 +132,16 @@ Decide where you want to store the application. We recommend:
    ```
 3. Clone the repository:
    ```cmd
-   git clone [YOUR-REPO-URL] B2.0Schedulingtool
+   git clone https://github.com/Thizman/B2.0Schedulingtool Schedulingtool
    ```
 4. Navigate into the folder:
    ```cmd
    cd B2.0Schedulingtool
    ```
-5. Switch to the correct branch:
+5. make sure you are on the main branch:
    ```cmd
-   git checkout claude/two-week-fixed-slots-0175iDKRXzMRm1iP6Xw8fLx9
+   git checkout main
    ```
-
-**Linux/Mac:**
-1. Open Terminal
-2. Navigate to your desired location:
-   ```bash
-   cd ~/Documents
-   ```
-3. Clone the repository:
-   ```bash
-   git clone [YOUR-REPO-URL] B2.0Schedulingtool
-   ```
-4. Navigate into the folder:
-   ```bash
-   cd B2.0Schedulingtool
-   ```
-5. Switch to the correct branch:
-   ```bash
-   git checkout claude/two-week-fixed-slots-0175iDKRXzMRm1iP6Xw8fLx9
-   ```
-
----
 
 ## Setting Up the Application
 
@@ -294,31 +161,11 @@ Make sure you have these files in your folder:
 Let's make sure everything works before creating shortcuts.
 
 **Windows:**
-1. Open Command Prompt in the application folder
+1. Open the file folder, right click an empty space in the folder and click "open in terminal"
 2. Run:
    ```cmd
    python scheduler.py
    ```
-
-**Linux/Mac:**
-1. Open Terminal in the application folder
-2. Make the script executable:
-   ```bash
-   chmod +x run_scheduler.sh
-   ```
-3. Run:
-   ```bash
-   ./run_scheduler.sh
-   ```
-   Or:
-   ```bash
-   python3 scheduler.py
-   ```
-
-**Expected Result:**
-- A window should open with the B2.0 Scheduling Tool interface
-- The calendar icon should appear in the window titlebar
-- If you see the interface, everything is working! 🎉
 
 ### Step 3: Test with Sample Data
 
@@ -337,271 +184,6 @@ Let's make sure everything works before creating shortcuts.
 
 ---
 
-## Creating a Desktop Shortcut
-
-Now let's create a convenient desktop shortcut so you can launch the app with one click.
-
-### Windows Desktop Shortcut
-
-#### Method 1: Using the Shortcut Wizard
-
-1. **Right-click on your Desktop**
-   - Select "New" → "Shortcut"
-
-2. **Enter the location:**
-   - Browse to your Python installation (usually: `C:\Windows\System32\pythonw.exe`)
-   - Or type the full path:
-   ```
-   C:\Windows\System32\pythonw.exe "C:\Users\YourName\Documents\B2.0Schedulingtool\scheduler.py"
-   ```
-   - Replace `YourName` with your actual username
-   - Click "Next"
-
-3. **Name your shortcut:**
-   - Type: `B2.0 Scheduler`
-   - Click "Finish"
-
-4. **Add the custom icon:**
-   - Right-click the new shortcut
-   - Select "Properties"
-   - Click "Change Icon..." button
-   - Click "Browse..."
-   - Navigate to: `C:\Users\YourName\Documents\B2.0Schedulingtool\calendar.ico`
-   - Click "OK"
-   - Click "Apply"
-   - Click "OK"
-
-5. **Done!** Double-click the shortcut to launch the app.
-
-#### Method 2: Using the Batch File
-
-1. **Navigate to your application folder in File Explorer**
-
-2. **Find `run_scheduler_silent.vbs`**
-   - Right-click it
-   - Select "Send to" → "Desktop (create shortcut)"
-
-3. **Rename the shortcut** (optional):
-   - Right-click the desktop shortcut
-   - Select "Rename"
-   - Type: `B2.0 Scheduler`
-
-4. **Add icon** (optional):
-   - Right-click the shortcut → Properties
-   - Click "Change Icon..."
-   - Browse to `calendar.ico`
-   - Click OK
-
----
-
-### Linux Desktop Shortcut
-
-#### Method 1: Using the .desktop File
-
-1. **Open Terminal**
-
-2. **Copy the desktop file:**
-   ```bash
-   cp ~/Documents/B2.0Schedulingtool/B2_Scheduler.desktop ~/Desktop/
-   ```
-
-3. **Make it executable:**
-   ```bash
-   chmod +x ~/Desktop/B2_Scheduler.desktop
-   ```
-
-4. **Trust the launcher** (if prompted):
-   ```bash
-   gio set ~/Desktop/B2_Scheduler.desktop metadata::trusted true
-   ```
-
-5. **Double-click the icon on your desktop to launch!**
-
-#### Method 2: Add to Applications Menu
-
-1. **Open Terminal**
-
-2. **Copy to applications folder:**
-   ```bash
-   mkdir -p ~/.local/share/applications
-   cp ~/Documents/B2.0Schedulingtool/B2_Scheduler.desktop ~/.local/share/applications/
-   ```
-
-3. **Update desktop database:**
-   ```bash
-   update-desktop-database ~/.local/share/applications/
-   ```
-
-4. **Find the app:**
-   - Open your application launcher (Activities/Start Menu)
-   - Search for "B2.0 Scheduler"
-   - Right-click → "Add to Favorites" to pin it
-
----
-
-### macOS Desktop Shortcut
-
-#### Method 1: Create an Application
-
-1. **Open Automator** (in Applications → Utilities)
-
-2. **Create a new Application:**
-   - Select "Application"
-   - Click "Choose"
-
-3. **Add a Run Shell Script action:**
-   - In the search bar, type "Run Shell Script"
-   - Drag "Run Shell Script" to the right panel
-   - In the script box, enter:
-   ```bash
-   cd ~/Documents/B2.0Schedulingtool
-   python3 scheduler.py
-   ```
-
-4. **Save the application:**
-   - File → Save
-   - Name: `B2.0 Scheduler`
-   - Location: Desktop (or Applications folder)
-   - Click "Save"
-
-5. **Add the icon** (optional):
-   - Get Info on the new app (Cmd + I)
-   - Open `calendar.ico` in Preview
-   - Edit → Select All (Cmd + A)
-   - Edit → Copy (Cmd + C)
-   - Click the small icon in Get Info window
-   - Edit → Paste (Cmd + V)
-
----
-
-## Usage Guide
-
-### Loading a CSV File
-
-1. **Click "Browse"** next to "CSV File"
-2. **Select your CSV file** (see [CSV Format](#csv-format) below)
-3. **File name turns green** when loaded successfully
-
-### Configuring Settings
-
-**Week Number:**
-- Enter the starting week number (e.g., 1 for week 1+2)
-
-**Total Hours Target:**
-- Total hours needed across all people for 2 weeks
-- Default: 270 hours
-
-**Shift Preference Rigidity:**
-- Slider from Flexible (0) to Strict (100)
-- **Low (0-30):** Allows more 2-hour individual shifts
-- **Medium (30-70):** Balanced mix of shift lengths
-- **High (70-100):** Prefers full morning/afternoon shifts
-
-**Weekly Hour Variance:**
-- Slider from 0h to 2h (in 0.5h increments)
-- Controls how much hours can vary between weeks
-- **0h:** Strict balance (exactly 50/50 split)
-- **1h:** Moderate flexibility (±1h per week)
-- **2h:** Maximum flexibility (±2h per week)
-
-**Desks Available Per Day:**
-- Set the number of available desks for each day
-- Week 1: Monday through Thursday
-- Week 2: Monday through Thursday
-
-### Generating a Schedule
-
-1. **Load your CSV file**
-2. **Adjust settings as needed**
-3. **Click "Generate Schedule"**
-4. **View results:**
-   - Schedule appears in the left panel (2 weeks, 8 days)
-   - Hours breakdown appears in the right panel
-   - Color-coded warnings show understaffing
-
-### Understanding the Display
-
-**Schedule View:**
-- **Week 1** (top): Monday-Thursday of first week
-- **Week 2** (bottom): Monday-Thursday of second week
-- **Colored blocks:** Each person has a unique color
-- **Merged blocks:** Consecutive shifts shown as one block
-- **Split at break:** Morning and afternoon separated by break line
-
-**Hours View:**
-- **Week 1 Hours:** Individual hours for first week
-- **Week 2 Hours:** Individual hours for second week
-- **Week 1 Total:** Sum for first week
-- **Week 2 Total:** Sum for second week
-- **Total (2 Weeks):** Combined totals
-- **Color coding:**
-  - 🟢 Green: At or above preferred hours
-  - 🟠 Orange: Below preferred, at or above agreed
-  - 🔴 Red: Below agreed hours
-
-**Warnings:**
-- ⚠️ Red: Less than 2 desks filled (critical)
-- ⚠️ Yellow: 2+ desks filled but not all (moderate)
-
-### Exporting
-
-**Export as PNG:**
-- Creates a high-resolution image of the complete schedule
-- Includes both weeks and hours breakdown
-- Perfect for printing or sharing
-
-**Export as CSV:**
-- Creates a formatted spreadsheet
-- Columns: Date, Person, Shift Hours, Hours
-- Dates grouped (shown once per day)
-- Second person marked as "[responsible person]"
-- Opens in Excel or any spreadsheet software
-
----
-
-## Sample Data
-
-The application includes three sample CSV files for testing:
-
-1. **sample_mean10_sd2.csv**
-   - Mean: 10 hours per week (20 total)
-   - Standard deviation: 2 hours
-   - Most people get 10h/week, some 8-12h, few 6-14h
-
-2. **sample_mean8_sd2.csv**
-   - Mean: 8 hours per week (16 total)
-   - Standard deviation: 2 hours
-   - Similar distribution, lower baseline
-
-3. **sample_mean10_sd4.csv**
-   - Mean: 10 hours per week (20 total)
-   - Standard deviation: 4 hours
-   - Wider spread (6-14h more common)
-
-### CSV Format
-
-Your CSV file must have these columns:
-
-**Required Columns:**
-- `name` - Person's full name
-- `agreed hours per 2 weeks` - Agreed total hours
-- `max hours per 2 weeks` - Maximum allowed hours
-- `preferred hours per 2 weeks` - Preferred total hours
-
-**Availability Columns:**
-For each day (M1, TU1, W1, TH1, M2, TU2, W2, TH2) and each shift (0930, 1030, 1315, 1530):
-- Column format: `[DAY][SHIFT]` (e.g., `M10930`, `TU11030`)
-- Values: `1` (available), `0` (not available)
-
-**Example:**
-```csv
-name,agreed hours per 2 weeks,max hours per 2 weeks,preferred hours per 2 weeks,M10930,M11030,M11315,M11530,...
-John Smith,20,24,20,1,1,0,0,...
-Jane Doe,18,22,18,0,1,1,1,...
-```
-
----
-
 ## Troubleshooting
 
 ### Application Won't Start
@@ -611,8 +193,7 @@ Jane Doe,18,22,18,0,1,1,1,...
 **Solutions:**
 1. **Check Python installation:**
    ```
-   python --version  (Windows)
-   python3 --version  (Linux/Mac)
+   python --version 
    ```
 
 2. **Check if Python is in PATH:**
@@ -635,25 +216,15 @@ Jane Doe,18,22,18,0,1,1,1,...
 
 **Solution:**
 ```bash
-pip install pillow  (Windows)
-pip3 install pillow  (Linux/Mac)
+pip install pillow
 ```
 
 ### Icon Not Showing
 
-**Windows:**
 - Right-click shortcut → Properties → Change Icon
 - Browse to `calendar.ico` in application folder
 - Click OK, Apply, OK
 - Refresh desktop (F5)
-
-**Linux:**
-- Check `.desktop` file Icon path is correct
-- Try converting .ico to .png:
-  ```bash
-  convert calendar.ico calendar.png
-  ```
-- Update Icon path in `.desktop` file
 
 ### Schedule Generation Fails
 
