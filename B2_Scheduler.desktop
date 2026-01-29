@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=B2.0 Scheduler
+Comment=2-week student scheduling tool with shift management
+Exec=/home/user/B2.0Schedulingtool/run_scheduler.sh
+Icon=/home/user/B2.0Schedulingtool/calendar.ico
+Terminal=false
+Categories=Office;Utility;
+Keywords=schedule;calendar;planning;shifts;
+StartupNotify=true
