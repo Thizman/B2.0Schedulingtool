@@ -45,17 +45,11 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 #### Step 1: Install Python
 
 1. **Download Python:**
-   - Go to [python.org/downloads](https://www.python.org/downloads/)
-   - Click the yellow "Download Python 3.x.x" button (get the latest version)
+   - Go to the Microsoft Store app
+   - Search for "Python"
+   - install the newest version (version 3.13.12 as of the 9th of february 2026)
 
-2. **Run the Installer:**
-   - Open the downloaded file (e.g., `python-3.11.x-amd64.exe`)
-   - ⚠️ **IMPORTANT:** Check the box "Add Python to PATH" at the bottom
-   - Click "Install Now"
-   - Wait for installation to complete
-   - Click "Close"
-
-3. **Verify Python Installation:**
+2. **Verify Python Installation:**
    - Open Command Prompt (Press `Win + R`, type `cmd`, press Enter)
    - Type: `python --version`
    - You should see: `Python 3.x.x`
@@ -64,6 +58,7 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Download Git:**
    - Go to [git-scm.com/download/win](https://git-scm.com/download/win)
+   - Click "Git for Windows/x64 Setup"
    - Download will start automatically
 
 2. **Run the Installer:**
@@ -81,16 +76,11 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 #### Step 3: Install Visual Studio Code (Optional but Recommended)
 
 1. **Download VS Code:**
-   - Go to [code.visualstudio.com](https://code.visualstudio.com/)
-   - Click "Download for Windows"
-
-2. **Run the Installer:**
-   - Open the downloaded file
-   - Accept the agreement
-   - Keep default settings
-   - **Check:** "Add to PATH"
-   - Click "Install"
-   - Click "Finish"
+   - Open the Microsoft Store app
+   - Search for "vscode"
+   - Click "install"
+   - Note: having vscode installed is not strictly necessary, but if you want to view/edit the code, this is the easiest code editor (at least for me) to use
+   - 
 
 #### Step 4: Install PIL/Pillow (Python Image Library)
 
