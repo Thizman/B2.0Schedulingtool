@@ -22,8 +22,7 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 ## Features
 
 ✅ **2-Week Scheduling** - Schedule across 8 days (Monday-Thursday for 2 consecutive weeks)
-✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-10:30, 10:30-12:45, 13:15-15:30, 15:30-17:00
-✅ **Mandatory Break** - Automatic 30-minute break enforcement (12:45-13:15)
+✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-12:30, 10:30-12:30, 13:00-15:30, 13:00-17:00
 ✅ **Smart Algorithm** - Priority-based scheduling with configurable rigidity
 ✅ **Weekly Variance Control** - Balance hours across both weeks (0-2h variance)
 ✅ **Visual Interface** - Clean, dark-themed GUI with color-coded warnings
@@ -589,15 +588,15 @@ Your CSV file must have these columns:
 - `preferred hours per 2 weeks` - Preferred total hours
 
 **Availability Columns:**
-For each day (M1, TU1, W1, TH1, M2, TU2, W2, TH2) and each shift (0930, 1030, 1315, 1530):
-- Column format: `[DAY][SHIFT]` (e.g., `M10930`, `TU11030`)
+For each day (M1, TU1, W1, TH1, M2, TU2, W2, TH2) and each shift (0930, 1030, 1300, 1300F):
+- Column format: `[DAY][SHIFT]` (e.g., `M10930`, `TU11030`, `M11300`, `M11300F`)
 - Values: `1` (available), `0` (not available)
 
 **Example:**
 ```csv
-name,agreed hours per 2 weeks,max hours per 2 weeks,preferred hours per 2 weeks,M10930,M11030,M11315,M11530,...
-John Smith,20,24,20,1,1,0,0,...
-Jane Doe,18,22,18,0,1,1,1,...
+name,agreed hours per 2 weeks,max hours per 2 weeks,preferred hours per 2 weeks,M10930,M11030,M11300,M11300F,...
+John Smith,20,24,20,1,1,0,1,...
+Jane Doe,18,22,18,0,1,1,0,...
 ```
 
 ---
@@ -663,7 +662,7 @@ pip3 install pillow  (Linux/Mac)
 1. **Check CSV file format**
    - Ensure all required columns exist
    - Check column names match exactly
-   - Verify shift codes (0930, 1030, 1315, 1530)
+   - Verify shift codes (0930, 1030, 1300, 1300F)
    - Ensure day codes (M1, TU1, W1, TH1, M2, TU2, W2, TH2)
 
 2. **Check CSV values**
@@ -728,8 +727,7 @@ pip3 install pillow  (Linux/Mac)
 **Hard Constraints:**
 - Never exceed desk capacity per shift
 - Never exceed maximum hours per person
-- Never violate 2-hour minimum shift length
-- Respect mandatory break (12:45-13:15)
+- Prevent conflicting overlapping shifts
 - Enforce weekly variance limits
 
 **Soft Preferences:**
@@ -741,21 +739,21 @@ pip3 install pillow  (Linux/Mac)
 ### Shift Structure
 
 **Fixed Shifts:**
-- **9:30-10:30** (1 hour) - Early morning
-- **10:30-12:45** (2.25 hours) - Mid-morning
-- **13:15-15:30** (2.25 hours) - Mid-afternoon
-- **15:30-17:00** (1.5 hours) - Late afternoon
+- **9:30-12:30** (3 hours) - Full morning shift
+- **10:30-12:30** (2 hours) - Late morning shift
+- **13:00-15:30** (2.5 hours) - Regular afternoon shift
+- **13:00-17:00** (4 hours) - Extended afternoon shift
 
-**Mandatory Break:**
-- **12:45-13:15** (30 minutes)
-- No one can work through this period
-- If working morning + afternoon, shown as 2 separate blocks
+**Shift Overlap Notes:**
+- Morning shifts overlap: 9:30-12:30 contains 10:30-12:30
+- Afternoon shifts overlap: 13:00-17:00 contains 13:00-15:30
+- A person cannot be assigned both overlapping shifts on the same day
 
 **Common Combinations:**
-- Full morning: 9:30-12:45 (3.25 hours)
-- Full afternoon: 13:15-17:00 (3.75 hours)
-- Full day: 9:30-12:45 + 13:15-17:00 (7 hours with break)
-- Cross-break: 10:30-12:45 + 13:15-15:30 (4.5 hours with break)
+- Full day (long): 9:30-12:30 + 13:00-17:00 (7 hours)
+- Full day (regular): 9:30-12:30 + 13:00-15:30 (5.5 hours)
+- Late start (long): 10:30-12:30 + 13:00-17:00 (6 hours)
+- Late start (regular): 10:30-12:30 + 13:00-15:30 (4.5 hours)
 
 ### Color Scheme
 
@@ -836,9 +834,9 @@ This creates 3 new sample CSV files with different distributions.
 ### CSV Preparation:
 
 1. **Use provided samples as templates**
-2. **Keep hours divisible by shift lengths** (0.25, 0.5, 0.75, 1, etc.)
+2. **Keep hours divisible by shift lengths** (0.5, 1, 1.5, 2, 2.5, 3, etc.)
 3. **Ensure preferred ≤ agreed ≤ max** for each person
-4. **Double-check shift codes** (0930, 1030, 1315, 1530)
+4. **Double-check shift codes** (0930, 1030, 1300, 1300F)
 5. **Verify day codes** (M1, TU1, W1, TH1, M2, TU2, W2, TH2)
 
 ---

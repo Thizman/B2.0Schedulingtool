@@ -80,18 +80,17 @@ class SchedulingTool:
         self.hours_scheduled = {}  # {person_name: hours}
         self.person_colors = {}  # {person_name: color}
 
-        # Timeslots (fixed shift times with mandatory break)
-        # Shifts: 9:30-10:30 (1h), 10:30-12:45 (2.25h), 13:15-15:30 (2.25h), 15:30-17:00 (1.5h)
-        # Mandatory break: 12:45-13:15 (0.5h)
+        # Timeslots (fixed shift times)
+        # Shifts: 9:30-12:30 (3h), 10:30-12:30 (2h), 13:00-15:30 (2.5h), 13:00-17:00 (4h)
         self.timeslots = [
-            "9:30", "10:30", "12:45", "13:15", "15:30", "17:00"
+            "9:30", "10:30", "12:30", "13:00", "15:30", "17:00"
         ]
-        self.timeslot_codes = ["0930", "1030", "1315", "1530"]  # Start time of each shift
+        self.timeslot_codes = ["0930", "1030", "1300", "1300F"]  # Start time of each shift
         self.shift_definitions = {
-            "0930": {"start": "9:30", "end": "10:30", "hours": 1.0},
-            "1030": {"start": "10:30", "end": "12:45", "hours": 2.25},
-            "1315": {"start": "13:15", "end": "15:30", "hours": 2.25},
-            "1530": {"start": "15:30", "end": "17:00", "hours": 1.5}
+            "0930": {"start": "9:30", "end": "12:30", "hours": 3.0},
+            "1030": {"start": "10:30", "end": "12:30", "hours": 2.0},
+            "1300": {"start": "13:00", "end": "15:30", "hours": 2.5},
+            "1300F": {"start": "13:00", "end": "17:00", "hours": 4.0}
         }
 
         # 2 weeks = 8 days (Mon-Thu, Week 1 and Week 2)
@@ -629,9 +628,9 @@ class SchedulingTool:
                                 shifts = person_data['shifts']
                                 hours = person_data['hours']
 
-                                # Format shift times with break notation
+                                # Format shift times
                                 morning_shifts = [s for s in shifts if s in ['0930', '1030']]
-                                afternoon_shifts = [s for s in shifts if s in ['1315', '1530']]
+                                afternoon_shifts = [s for s in shifts if s in ['1300', '1300F']]
 
                                 shift_parts = []
                                 if morning_shifts:
@@ -742,8 +741,8 @@ class SchedulingTool:
         day_width = 350
         day_height = 300
 
-        # Shift heights for drawing
-        shift_heights = {"0930": 30, "1030": 70, "1315": 70, "1530": 50}
+        # Shift heights for drawing (proportional to hours)
+        shift_heights = {"0930": 90, "1030": 60, "1300": 75, "1300F": 120}
 
         # Draw 2x4 grid of days (2 columns, 4 rows for 8 days)
         for day_idx, day in enumerate(self.day_names):
@@ -1058,15 +1057,15 @@ class SchedulingTool:
         HARD CONSTRAINTS:
         1. Never exceed desk capacity per shift (ABSOLUTE HARD LIMIT)
         2. Never schedule someone for over their max hours (ABSOLUTE HARD LIMIT)
-        3. Respect mandatory break 12:45-13:15 (no one works both 1030 and 1315 without splitting)
-        4. Weekly variance limit: |week_hours - preferred/2| <= weekly_variance (per week)
+        3. Weekly variance limit: |week_hours - preferred/2| <= weekly_variance (per week)
+        4. Prevent conflicting shift assignments (overlapping time slots)
 
         PRIORITIES:
         1. Schedule everyone with nonzero preferred hours
         2. Get everyone to their preferred hours (can exceed total target for this)
         3. Try to meet or exceed total hours target
         4. Respect rigidity parameter for shift combinations
-        5. Prefer 2+ hour shifts (but allow shorter if needed)
+        5. Prefer longer shifts when possible
         """
 
         # Track shift filling for balance
@@ -1164,13 +1163,14 @@ class SchedulingTool:
         Find the best available shift combination for a person based on rigidity
 
         Shift combinations by rigidity level:
-        - High (70-100): Prefer full morning (0930+1030) or full afternoon (1315+1530)
-        - Medium (30-70): Allow 1030+1315 (with mandatory break)
-        - Low (0-30): Allow individual shifts, including short ones
-
-        2-hour minimum: Only enforce when rigidity is medium/high
+        - High (70-100): Prefer longer single shifts (0930 or 1300F)
+        - Medium (30-70): Allow mid-length shifts (1030, 1300, 1300F)
+        - Low (0-30): Allow any shift, including shorter ones
 
         Weekly variance: Enforce weekly hour distribution constraint
+
+        Note: Shifts can overlap (0930 overlaps with 1030, 1300F contains 1300),
+        so conflicts must be prevented
         """
         best_combo = None
         best_score = float('inf')
@@ -1193,32 +1193,40 @@ class SchedulingTool:
             return None
 
         # Define possible shift combinations by rigidity
-        # HARD CONSTRAINT: Minimum 2 hours per shift (no 1h or 1.5h shifts allowed)
+        # Note: 0930 overlaps with 1030, 1300F overlaps with 1300
         if rigidity >= 70:
-            # High rigidity: Prefer full morning or full afternoon
+            # High rigidity: Prefer longest shifts and full day combinations
             combo_priorities = [
-                ['0930', '1030'],  # Full morning (3.25h)
-                ['1315', '1530'],  # Full afternoon (3.75h)
-                ['1030'],          # Mid-morning only (2.25h)
-                ['1315'],          # Mid-afternoon only (2.25h)
+                ['0930', '1300F'],  # Full day: morning + long afternoon (7h)
+                ['1300F'],          # Long afternoon only (4h)
+                ['0930'],           # Full morning (3h)
+                ['1030', '1300F'],  # Late morning + long afternoon (6h)
+                ['1300'],           # Regular afternoon (2.5h)
+                ['1030'],           # Late morning (2h)
             ]
         elif rigidity >= 30:
-            # Medium rigidity: Allow cross-break combinations
+            # Medium rigidity: Allow various combinations
             combo_priorities = [
-                ['0930', '1030'],  # Full morning (3.25h)
-                ['1315', '1530'],  # Full afternoon (3.75h)
-                ['1030', '1315'],  # Cross break (4.5h) - requires split
-                ['1030'],          # Mid-morning only (2.25h)
-                ['1315'],          # Mid-afternoon only (2.25h)
+                ['0930', '1300F'],  # Full day: morning + long afternoon (7h)
+                ['1030', '1300F'],  # Late morning + long afternoon (6h)
+                ['0930', '1300'],   # Morning + regular afternoon (5.5h)
+                ['1300F'],          # Long afternoon only (4h)
+                ['0930'],           # Full morning (3h)
+                ['1030', '1300'],   # Late morning + regular afternoon (4.5h)
+                ['1300'],           # Regular afternoon (2.5h)
+                ['1030'],           # Late morning (2h)
             ]
         else:
-            # Low rigidity: Prioritize cross-break and individual 2h+ shifts
+            # Low rigidity: Allow all valid combinations, prioritize longer shifts
             combo_priorities = [
-                ['1030', '1315'],  # Cross break (4.5h)
-                ['0930', '1030'],  # Full morning (3.25h)
-                ['1315', '1530'],  # Full afternoon (3.75h)
-                ['1030'],          # Mid-morning only (2.25h)
-                ['1315'],          # Mid-afternoon only (2.25h)
+                ['0930', '1300F'],  # Full day: morning + long afternoon (7h)
+                ['1030', '1300F'],  # Late morning + long afternoon (6h)
+                ['0930', '1300'],   # Morning + regular afternoon (5.5h)
+                ['1030', '1300'],   # Late morning + regular afternoon (4.5h)
+                ['1300F'],          # Long afternoon only (4h)
+                ['0930'],           # Full morning (3h)
+                ['1300'],           # Regular afternoon (2.5h)
+                ['1030'],           # Late morning (2h)
             ]
 
         # Try each day
@@ -1432,12 +1440,12 @@ class SchedulingTool:
         schedule_grid = tk.Frame(day_container, bg=self.colors['bg_dark'])
         schedule_grid.pack(fill=tk.BOTH, expand=True)
 
-        # Calculate heights for each shift
+        # Calculate heights for each shift (proportional to hours)
         shift_heights = {
-            "0930": 40,   # 1h shift
-            "1030": 90,   # 2.25h shift
-            "1315": 90,   # 2.25h shift
-            "1530": 60    # 1.5h shift
+            "0930": 90,   # 3h shift
+            "1030": 60,   # 2h shift
+            "1300": 75,   # 2.5h shift
+            "1300F": 120  # 4h shift
         }
         total_height = sum(shift_heights.values())
 
@@ -1550,12 +1558,12 @@ class SchedulingTool:
                     if assigned_lane is None:
                         assigned_lane = 0
 
-                    # Group consecutive shifts (split only on mandatory break at 12:45-13:15)
-                    # Morning shifts: 0930, 1030 (end at 12:45)
-                    # Afternoon shifts: 1315, 1530 (start at 13:15)
+                    # Group non-overlapping shifts
+                    # Morning shifts: 0930 (9:30-12:30), 1030 (10:30-12:30) - only one can be scheduled
+                    # Afternoon shifts: 1300 (13:00-15:30), 1300F (13:00-17:00) - only one can be scheduled
                     shift_groups = []
                     morning_shifts = [s for s in shifts if s in ['0930', '1030']]
-                    afternoon_shifts = [s for s in shifts if s in ['1315', '1530']]
+                    afternoon_shifts = [s for s in shifts if s in ['1300', '1300F']]
 
                     if morning_shifts:
                         shift_groups.append(morning_shifts)
