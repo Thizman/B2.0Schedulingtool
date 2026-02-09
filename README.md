@@ -16,8 +16,8 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 ## Features
 
 ✅ **2-Week Scheduling** - Schedule across 8 days (Monday-Thursday for 2 consecutive weeks)
-✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-10:30, 10:30-12:45, 13:15-15:30, 15:30-17:00
-✅ **Mandatory Break** - Automatic 30-minute break enforcement (12:45-13:15)
+✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-10:30, 10:30-12:30, 13:00-15:30, 15:30-17:00
+✅ **Mandatory Break** - Automatic 30-minute break enforcement (12:30-13:00)
 ✅ **Smart Algorithm** - Priority-based scheduling with configurable rigidity
 ✅ **Weekly Variance Control** - Balance hours across both weeks (0-2h variance)
 ✅ **Visual Interface** - Clean, dark-themed GUI with color-coded warnings
