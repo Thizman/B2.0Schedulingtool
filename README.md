@@ -6,14 +6,8 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-  - [Windows](#windows-installation)
-  - [Linux/Ubuntu](#linuxubuntu-installation)
-  - [macOS](#macos-installation)
 - [Getting the Application](#getting-the-application)
 - [Setting Up the Application](#setting-up-the-application)
-- [Creating a Desktop Shortcut](#creating-a-desktop-shortcut)
-- [Usage Guide](#usage-guide)
-- [Sample Data](#sample-data)
 - [Troubleshooting](#troubleshooting)
 - [Application Features](#application-features)
 
@@ -39,29 +33,22 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Python 3.6 or higher**
 2. **Git** (for downloading the application)
-3. **Visual Studio Code** (recommended code editor)
-4. **pip** (Python package manager - usually comes with Python)
-
+3. **pip** (Python package manager - usually comes with Python)
+4. (optional) A code editor of choice.
 ---
 
 ## Installation
 
-### Windows Installation
+### currently only explained for Windows installation
 
 #### Step 1: Install Python
 
 1. **Download Python:**
-   - Go to [python.org/downloads](https://www.python.org/downloads/)
-   - Click the yellow "Download Python 3.x.x" button (get the latest version)
+   - Go to the Microsoft Store app
+   - Search for "Python"
+   - install the newest version (version 3.13.12 as of the 9th of february 2026)
 
-2. **Run the Installer:**
-   - Open the downloaded file (e.g., `python-3.11.x-amd64.exe`)
-   - ⚠️ **IMPORTANT:** Check the box "Add Python to PATH" at the bottom
-   - Click "Install Now"
-   - Wait for installation to complete
-   - Click "Close"
-
-3. **Verify Python Installation:**
+2. **Verify Python Installation:**
    - Open Command Prompt (Press `Win + R`, type `cmd`, press Enter)
    - Type: `python --version`
    - You should see: `Python 3.x.x`
@@ -70,6 +57,7 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Download Git:**
    - Go to [git-scm.com/download/win](https://git-scm.com/download/win)
+   - Click "Git for Windows/x64 Setup"
    - Download will start automatically
 
 2. **Run the Installer:**
@@ -87,16 +75,11 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 #### Step 3: Install Visual Studio Code (Optional but Recommended)
 
 1. **Download VS Code:**
-   - Go to [code.visualstudio.com](https://code.visualstudio.com/)
-   - Click "Download for Windows"
-
-2. **Run the Installer:**
-   - Open the downloaded file
-   - Accept the agreement
-   - Keep default settings
-   - **Check:** "Add to PATH"
-   - Click "Install"
-   - Click "Finish"
+   - Open the Microsoft Store app
+   - Search for "vscode"
+   - Click "install"
+   - Note: having vscode installed is not strictly necessary, but if you want to view/edit the code, this is the easiest code editor (at least for me) to use
+   - 
 
 #### Step 4: Install PIL/Pillow (Python Image Library)
 
@@ -104,120 +87,11 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 2. **Install Pillow:**
    ```cmd
-   pip install pillow
+   py -m pip install Pillow
    ```
 
 3. **Wait for installation to complete**
    - You should see: "Successfully installed pillow-x.x.x"
-
----
-
-### Linux/Ubuntu Installation
-
-#### Step 1: Install Python and pip
-
-1. **Open Terminal** (Press `Ctrl + Alt + T`)
-
-2. **Update package list:**
-   ```bash
-   sudo apt update
-   ```
-
-3. **Install Python 3 and pip:**
-   ```bash
-   sudo apt install python3 python3-pip python3-tk
-   ```
-
-4. **Verify installation:**
-   ```bash
-   python3 --version
-   pip3 --version
-   ```
-
-#### Step 2: Install Git
-
-1. **In Terminal, run:**
-   ```bash
-   sudo apt install git
-   ```
-
-2. **Verify installation:**
-   ```bash
-   git --version
-   ```
-
-#### Step 3: Install Visual Studio Code (Optional)
-
-1. **Download VS Code:**
-   - Go to [code.visualstudio.com](https://code.visualstudio.com/)
-   - Click "Download for Linux" (.deb package for Ubuntu)
-
-2. **Install the package:**
-   ```bash
-   sudo dpkg -i ~/Downloads/code_*.deb
-   sudo apt install -f
-   ```
-
-#### Step 4: Install Pillow
-
-```bash
-pip3 install pillow
-```
-
----
-
-### macOS Installation
-
-#### Step 1: Install Homebrew (Package Manager)
-
-1. **Open Terminal** (Press `Cmd + Space`, type "Terminal", press Enter)
-
-2. **Install Homebrew:**
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-
-3. **Follow the on-screen instructions**
-
-#### Step 2: Install Python
-
-1. **In Terminal, run:**
-   ```bash
-   brew install python
-   ```
-
-2. **Verify installation:**
-   ```bash
-   python3 --version
-   ```
-
-#### Step 3: Install Git
-
-1. **In Terminal, run:**
-   ```bash
-   brew install git
-   ```
-
-2. **Verify installation:**
-   ```bash
-   git --version
-   ```
-
-#### Step 4: Install Visual Studio Code (Optional)
-
-1. **Download VS Code:**
-   - Go to [code.visualstudio.com](https://code.visualstudio.com/)
-   - Click "Download for macOS"
-
-2. **Install:**
-   - Open the downloaded .zip file
-   - Drag "Visual Studio Code" to Applications folder
-
-#### Step 5: Install Pillow
-
-```bash
-pip3 install pillow
-```
 
 ---
 
@@ -227,9 +101,8 @@ Now that you have all prerequisites installed, let's download the B2.0 Schedulin
 
 ### Step 1: Choose a Location
 
-Decide where you want to store the application. We recommend:
-- **Windows:** `C:\Users\YourName\Documents\B2.0Schedulingtool`
-- **Linux/Mac:** `~/Documents/B2.0Schedulingtool`
+Decide where you want to store the application. I recommend:
+-`C:\Users\YourName\Documents\SchedulingTool`
 
 ### Step 2: Clone the Repository
 
@@ -243,37 +116,16 @@ Decide where you want to store the application. We recommend:
    ```
 3. Clone the repository:
    ```cmd
-   git clone [YOUR-REPO-URL] B2.0Schedulingtool
+   git clone https://github.com/Thizman/B2.0Schedulingtool Schedulingtool
    ```
 4. Navigate into the folder:
    ```cmd
    cd B2.0Schedulingtool
    ```
-5. Switch to the correct branch:
+5. make sure you are on the main branch:
    ```cmd
-   git checkout claude/two-week-fixed-slots-0175iDKRXzMRm1iP6Xw8fLx9
+   git checkout main
    ```
-
-**Linux/Mac:**
-1. Open Terminal
-2. Navigate to your desired location:
-   ```bash
-   cd ~/Documents
-   ```
-3. Clone the repository:
-   ```bash
-   git clone [YOUR-REPO-URL] B2.0Schedulingtool
-   ```
-4. Navigate into the folder:
-   ```bash
-   cd B2.0Schedulingtool
-   ```
-5. Switch to the correct branch:
-   ```bash
-   git checkout claude/two-week-fixed-slots-0175iDKRXzMRm1iP6Xw8fLx9
-   ```
-
----
 
 ## Setting Up the Application
 
@@ -610,8 +462,7 @@ Jane Doe,18,22,18,0,1,1,0,...
 **Solutions:**
 1. **Check Python installation:**
    ```
-   python --version  (Windows)
-   python3 --version  (Linux/Mac)
+   python --version 
    ```
 
 2. **Check if Python is in PATH:**
@@ -634,25 +485,15 @@ Jane Doe,18,22,18,0,1,1,0,...
 
 **Solution:**
 ```bash
-pip install pillow  (Windows)
-pip3 install pillow  (Linux/Mac)
+pip install pillow
 ```
 
 ### Icon Not Showing
 
-**Windows:**
 - Right-click shortcut → Properties → Change Icon
 - Browse to `calendar.ico` in application folder
 - Click OK, Apply, OK
 - Refresh desktop (F5)
-
-**Linux:**
-- Check `.desktop` file Icon path is correct
-- Try converting .ico to .png:
-  ```bash
-  convert calendar.ico calendar.png
-  ```
-- Update Icon path in `.desktop` file
 
 ### Schedule Generation Fails
 
