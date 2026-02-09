@@ -779,8 +779,9 @@ class SchedulingTool:
             for shift_code in self.timeslot_codes:
                 shift_info = self.shift_definitions[shift_code]
 
-                # Time label
-                draw.text((time_x, y_offset), shift_info['start'], fill=text_muted, font=small_font)
+                # Time label (show full range for clarity)
+                time_label = f"{shift_info['start']}-{shift_info['end']}"
+                draw.text((time_x, y_offset), time_label, fill=text_muted, font=small_font)
 
                 # Warning if understaffed
                 if shift_counts[shift_code] < desks:
@@ -1262,12 +1263,41 @@ class SchedulingTool:
                 if not all_available:
                     continue
 
-                # Check if person already in any of these shifts (prevent overlaps)
+                # Check if person already in any of these shifts (prevent duplicates)
                 already_in_shifts = any(
                     person['name'] in self.temp_schedule[day][code]
                     for code in shift_codes
                 )
                 if already_in_shifts:
+                    continue
+
+                # Check for conflicting overlapping shifts
+                # Morning shifts (0930 and 1030) overlap - can't have both
+                # Afternoon shifts (1300 and 1300F) overlap - can't have both
+                has_conflict = False
+                for shift_code in shift_codes:
+                    if shift_code == '0930':
+                        # Check if person already has 1030
+                        if person['name'] in self.temp_schedule[day]['1030']:
+                            has_conflict = True
+                            break
+                    elif shift_code == '1030':
+                        # Check if person already has 0930
+                        if person['name'] in self.temp_schedule[day]['0930']:
+                            has_conflict = True
+                            break
+                    elif shift_code == '1300':
+                        # Check if person already has 1300F
+                        if person['name'] in self.temp_schedule[day]['1300F']:
+                            has_conflict = True
+                            break
+                    elif shift_code == '1300F':
+                        # Check if person already has 1300
+                        if person['name'] in self.temp_schedule[day]['1300']:
+                            has_conflict = True
+                            break
+
+                if has_conflict:
                     continue
 
                 # Check if all shifts have desk capacity
@@ -1454,12 +1484,14 @@ class SchedulingTool:
                                bg=self.colors['bg_dark'], highlightthickness=0)
         time_canvas.grid(row=0, column=0, sticky=(tk.N, tk.S), padx=(0, 5))
 
-        # Add time labels for each shift
+        # Add time labels for each shift (show full range)
         y_offset = 0
         for shift_code in self.timeslot_codes:
             shift_info = self.shift_definitions[shift_code]
-            time_canvas.create_text(55, y_offset + 5, text=shift_info['start'],
-                                   font=("Consolas", 9),
+            # Display full time range for clarity
+            time_label = f"{shift_info['start']}-{shift_info['end']}"
+            time_canvas.create_text(55, y_offset + 5, text=time_label,
+                                   font=("Consolas", 8),
                                    fill=self.colors['text_muted'],
                                    anchor=tk.E)
             y_offset += shift_heights[shift_code]
