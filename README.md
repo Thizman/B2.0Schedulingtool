@@ -17,6 +17,7 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 
 ✅ **2-Week Scheduling** - Schedule across 8 days (Monday-Thursday for 2 consecutive weeks)
 ✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-12:30, 10:30-12:30, 13:00-15:30, 13:00-17:00
+✅ **Mandatory Break** - Automatic 30-minute break (12:30-13:00) between morning and afternoon
 ✅ **Smart Algorithm** - Priority-based scheduling with configurable rigidity
 ✅ **Weekly Variance Control** - Balance hours across both weeks (0-2h variance)
 ✅ **Visual Interface** - Clean, dark-themed GUI with color-coded warnings
@@ -585,16 +586,21 @@ pip install pillow
 - **13:00-15:30** (2.5 hours) - Regular afternoon shift
 - **13:00-17:00** (4 hours) - Extended afternoon shift
 
+**Mandatory Break:**
+- **12:30-13:00** (30 minutes)
+- No shifts cover this time period
+- Automatic break for anyone working morning + afternoon shifts
+
 **Shift Overlap Notes:**
 - Morning shifts overlap: 9:30-12:30 contains 10:30-12:30
 - Afternoon shifts overlap: 13:00-17:00 contains 13:00-15:30
 - A person cannot be assigned both overlapping shifts on the same day
 
 **Common Combinations:**
-- Full day (long): 9:30-12:30 + 13:00-17:00 (7 hours)
-- Full day (regular): 9:30-12:30 + 13:00-15:30 (5.5 hours)
-- Late start (long): 10:30-12:30 + 13:00-17:00 (6 hours)
-- Late start (regular): 10:30-12:30 + 13:00-15:30 (4.5 hours)
+- Full day (long): 9:30-12:30 + 13:00-17:00 (7 hours with 30-min break)
+- Full day (regular): 9:30-12:30 + 13:00-15:30 (5.5 hours with 30-min break)
+- Late start (long): 10:30-12:30 + 13:00-17:00 (6 hours with 30-min break)
+- Late start (regular): 10:30-12:30 + 13:00-15:30 (4.5 hours with 30-min break)
 
 ### Color Scheme
 
