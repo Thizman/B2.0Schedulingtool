@@ -1,4 +1,4 @@
-# B2.0 Scheduling Tool
+"# B2.0 Scheduling Tool
 
 A comprehensive 2-week scheduling application for managing student shifts with fixed time slots, built with Python and Tkinter.
 
@@ -16,8 +16,8 @@ A comprehensive 2-week scheduling application for managing student shifts with f
 ## Features
 
 ✅ **2-Week Scheduling** - Schedule across 8 days (Monday-Thursday for 2 consecutive weeks)
-✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-12:30, 10:30-12:30, 13:00-15:30, 13:00-17:00
-✅ **Mandatory Break** - Automatic 30-minute break (12:30-13:00) between morning and afternoon
+✅ **Fixed Time Slots** - 4 predefined shifts: 9:30-10:30, 10:30-12:30, 13:00-15:30, 15:30-17:00
+✅ **Mandatory Break** - Automatic 30-minute break enforcement (12:30-13:00)
 ✅ **Smart Algorithm** - Priority-based scheduling with configurable rigidity
 ✅ **Weekly Variance Control** - Balance hours across both weeks (0-2h variance)
 ✅ **Visual Interface** - Clean, dark-themed GUI with color-coded warnings
@@ -46,7 +46,7 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Download Python:**
    - Go to the Microsoft Store app
-   - Search for "Python"
+   - Search for ""Python""
    - install the newest version (version 3.13.12 as of the 9th of february 2026)
 
 2. **Verify Python Installation:**
@@ -58,15 +58,15 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Download Git:**
    - Go to [git-scm.com/download/win](https://git-scm.com/download/win)
-   - Click "Git for Windows/x64 Setup"
+   - Click ""Git for Windows/x64 Setup""
    - Download will start automatically
 
 2. **Run the Installer:**
    - Open the downloaded file (e.g., `Git-2.x.x-64-bit.exe`)
-   - Click "Next" through the installation wizard
+   - Click ""Next"" through the installation wizard
    - Keep all default settings
-   - Click "Install"
-   - Click "Finish"
+   - Click ""Install""
+   - Click ""Finish""
 
 3. **Verify Git Installation:**
    - Open Command Prompt
@@ -77,8 +77,8 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
 
 1. **Download VS Code:**
    - Open the Microsoft Store app
-   - Search for "vscode"
-   - Click "install"
+   - Search for ""vscode""
+   - Click ""install""
    - Note: having vscode installed is not strictly necessary, but if you want to view/edit the code, this is the easiest code editor (at least for me) to use
    - 
 
@@ -92,7 +92,7 @@ Before installing the B2.0 Scheduling Tool, you'll need to install several softw
    ```
 
 3. **Wait for installation to complete**
-   - You should see: "Successfully installed pillow-x.x.x"
+   - You should see: ""Successfully installed pillow-x.x.x""
 
 ---
 
@@ -130,329 +130,7 @@ Decide where you want to store the application. I recommend:
 
 ## Setting Up the Application
 
-### Step 1: Verify Files
-
-Make sure you have these files in your folder:
-- `scheduler.py` - Main application file
-- `calendar.ico` - Application icon
-- `run_scheduler.sh` - Linux launcher
-- `run_scheduler.bat` - Windows launcher
-- `run_scheduler_silent.vbs` - Windows silent launcher
-- `B2_Scheduler.desktop` - Linux desktop entry
-- Sample CSV files (sample_mean10_sd2.csv, etc.)
-
-### Step 2: Test the Application
-
-Let's make sure everything works before creating shortcuts.
-
-**Windows:**
-1. Open Command Prompt in the application folder
-2. Run:
-   ```cmd
-   python scheduler.py
-   ```
-
-**Linux/Mac:**
-1. Open Terminal in the application folder
-2. Make the script executable:
-   ```bash
-   chmod +x run_scheduler.sh
-   ```
-3. Run:
-   ```bash
-   ./run_scheduler.sh
-   ```
-   Or:
-   ```bash
-   python3 scheduler.py
-   ```
-
-**Expected Result:**
-- A window should open with the B2.0 Scheduling Tool interface
-- The calendar icon should appear in the window titlebar
-- If you see the interface, everything is working! 🎉
-
-### Step 3: Test with Sample Data
-
-1. **In the application:**
-   - Click "Browse" next to "CSV File"
-   - Navigate to the application folder
-   - Select `sample_mean10_sd2.csv`
-   - Click "Open"
-
-2. **Generate a schedule:**
-   - Adjust settings if desired (or keep defaults)
-   - Click "Generate Schedule"
-   - You should see the schedule appear with colored blocks
-
-3. **Success!** Your application is working correctly.
-
----
-
-## Creating a Desktop Shortcut
-
-Now let's create a convenient desktop shortcut so you can launch the app with one click.
-
-### Windows Desktop Shortcut
-
-#### Method 1: Using the Shortcut Wizard
-
-1. **Right-click on your Desktop**
-   - Select "New" → "Shortcut"
-
-2. **Enter the location:**
-   - Browse to your Python installation (usually: `C:\Windows\System32\pythonw.exe`)
-   - Or type the full path:
-   ```
-   C:\Windows\System32\pythonw.exe "C:\Users\YourName\Documents\B2.0Schedulingtool\scheduler.py"
-   ```
-   - Replace `YourName` with your actual username
-   - Click "Next"
-
-3. **Name your shortcut:**
-   - Type: `B2.0 Scheduler`
-   - Click "Finish"
-
-4. **Add the custom icon:**
-   - Right-click the new shortcut
-   - Select "Properties"
-   - Click "Change Icon..." button
-   - Click "Browse..."
-   - Navigate to: `C:\Users\YourName\Documents\B2.0Schedulingtool\calendar.ico`
-   - Click "OK"
-   - Click "Apply"
-   - Click "OK"
-
-5. **Done!** Double-click the shortcut to launch the app.
-
-#### Method 2: Using the Batch File
-
-1. **Navigate to your application folder in File Explorer**
-
-2. **Find `run_scheduler_silent.vbs`**
-   - Right-click it
-   - Select "Send to" → "Desktop (create shortcut)"
-
-3. **Rename the shortcut** (optional):
-   - Right-click the desktop shortcut
-   - Select "Rename"
-   - Type: `B2.0 Scheduler`
-
-4. **Add icon** (optional):
-   - Right-click the shortcut → Properties
-   - Click "Change Icon..."
-   - Browse to `calendar.ico`
-   - Click OK
-
----
-
-### Linux Desktop Shortcut
-
-#### Method 1: Using the .desktop File
-
-1. **Open Terminal**
-
-2. **Copy the desktop file:**
-   ```bash
-   cp ~/Documents/B2.0Schedulingtool/B2_Scheduler.desktop ~/Desktop/
-   ```
-
-3. **Make it executable:**
-   ```bash
-   chmod +x ~/Desktop/B2_Scheduler.desktop
-   ```
-
-4. **Trust the launcher** (if prompted):
-   ```bash
-   gio set ~/Desktop/B2_Scheduler.desktop metadata::trusted true
-   ```
-
-5. **Double-click the icon on your desktop to launch!**
-
-#### Method 2: Add to Applications Menu
-
-1. **Open Terminal**
-
-2. **Copy to applications folder:**
-   ```bash
-   mkdir -p ~/.local/share/applications
-   cp ~/Documents/B2.0Schedulingtool/B2_Scheduler.desktop ~/.local/share/applications/
-   ```
-
-3. **Update desktop database:**
-   ```bash
-   update-desktop-database ~/.local/share/applications/
-   ```
-
-4. **Find the app:**
-   - Open your application launcher (Activities/Start Menu)
-   - Search for "B2.0 Scheduler"
-   - Right-click → "Add to Favorites" to pin it
-
----
-
-### macOS Desktop Shortcut
-
-#### Method 1: Create an Application
-
-1. **Open Automator** (in Applications → Utilities)
-
-2. **Create a new Application:**
-   - Select "Application"
-   - Click "Choose"
-
-3. **Add a Run Shell Script action:**
-   - In the search bar, type "Run Shell Script"
-   - Drag "Run Shell Script" to the right panel
-   - In the script box, enter:
-   ```bash
-   cd ~/Documents/B2.0Schedulingtool
-   python3 scheduler.py
-   ```
-
-4. **Save the application:**
-   - File → Save
-   - Name: `B2.0 Scheduler`
-   - Location: Desktop (or Applications folder)
-   - Click "Save"
-
-5. **Add the icon** (optional):
-   - Get Info on the new app (Cmd + I)
-   - Open `calendar.ico` in Preview
-   - Edit → Select All (Cmd + A)
-   - Edit → Copy (Cmd + C)
-   - Click the small icon in Get Info window
-   - Edit → Paste (Cmd + V)
-
----
-
-## Usage Guide
-
-### Loading a CSV File
-
-1. **Click "Browse"** next to "CSV File"
-2. **Select your CSV file** (see [CSV Format](#csv-format) below)
-3. **File name turns green** when loaded successfully
-
-### Configuring Settings
-
-**Week Number:**
-- Enter the starting week number (e.g., 1 for week 1+2)
-
-**Total Hours Target:**
-- Total hours needed across all people for 2 weeks
-- Default: 270 hours
-
-**Shift Preference Rigidity:**
-- Slider from Flexible (0) to Strict (100)
-- **Low (0-30):** Allows more 2-hour individual shifts
-- **Medium (30-70):** Balanced mix of shift lengths
-- **High (70-100):** Prefers full morning/afternoon shifts
-
-**Weekly Hour Variance:**
-- Slider from 0h to 2h (in 0.5h increments)
-- Controls how much hours can vary between weeks
-- **0h:** Strict balance (exactly 50/50 split)
-- **1h:** Moderate flexibility (±1h per week)
-- **2h:** Maximum flexibility (±2h per week)
-
-**Desks Available Per Day:**
-- Set the number of available desks for each day
-- Week 1: Monday through Thursday
-- Week 2: Monday through Thursday
-
-### Generating a Schedule
-
-1. **Load your CSV file**
-2. **Adjust settings as needed**
-3. **Click "Generate Schedule"**
-4. **View results:**
-   - Schedule appears in the left panel (2 weeks, 8 days)
-   - Hours breakdown appears in the right panel
-   - Color-coded warnings show understaffing
-
-### Understanding the Display
-
-**Schedule View:**
-- **Week 1** (top): Monday-Thursday of first week
-- **Week 2** (bottom): Monday-Thursday of second week
-- **Colored blocks:** Each person has a unique color
-- **Merged blocks:** Consecutive shifts shown as one block
-- **Split at break:** Morning and afternoon separated by break line
-
-**Hours View:**
-- **Week 1 Hours:** Individual hours for first week
-- **Week 2 Hours:** Individual hours for second week
-- **Week 1 Total:** Sum for first week
-- **Week 2 Total:** Sum for second week
-- **Total (2 Weeks):** Combined totals
-- **Color coding:**
-  - 🟢 Green: At or above preferred hours
-  - 🟠 Orange: Below preferred, at or above agreed
-  - 🔴 Red: Below agreed hours
-
-**Warnings:**
-- ⚠️ Red: Less than 2 desks filled (critical)
-- ⚠️ Yellow: 2+ desks filled but not all (moderate)
-
-### Exporting
-
-**Export as PNG:**
-- Creates a high-resolution image of the complete schedule
-- Includes both weeks and hours breakdown
-- Perfect for printing or sharing
-
-**Export as CSV:**
-- Creates a formatted spreadsheet
-- Columns: Date, Person, Shift Hours, Hours
-- Dates grouped (shown once per day)
-- Second person marked as "[responsible person]"
-- Opens in Excel or any spreadsheet software
-
----
-
-## Sample Data
-
-The application includes three sample CSV files for testing:
-
-1. **sample_mean10_sd2.csv**
-   - Mean: 10 hours per week (20 total)
-   - Standard deviation: 2 hours
-   - Most people get 10h/week, some 8-12h, few 6-14h
-
-2. **sample_mean8_sd2.csv**
-   - Mean: 8 hours per week (16 total)
-   - Standard deviation: 2 hours
-   - Similar distribution, lower baseline
-
-3. **sample_mean10_sd4.csv**
-   - Mean: 10 hours per week (20 total)
-   - Standard deviation: 4 hours
-   - Wider spread (6-14h more common)
-
-### CSV Format
-
-Your CSV file must have these columns:
-
-**Required Columns:**
-- `name` - Person's full name
-- `agreed hours per 2 weeks` - Agreed total hours
-- `max hours per 2 weeks` - Maximum allowed hours
-- `preferred hours per 2 weeks` - Preferred total hours
-
-**Availability Columns:**
-For each day (M1, TU1, W1, TH1, M2, TU2, W2, TH2) and each shift (0930, 1030, 1300, 1300F):
-- Column format: `[DAY][SHIFT]` (e.g., `M10930`, `TU11030`, `M11300`, `M11300F`)
-- Values: `1` (available), `0` (not available)
-
-**Example:**
-```csv
-name,agreed hours per 2 weeks,max hours per 2 weeks,preferred hours per 2 weeks,M10930,M11030,M11300,M11300F,...
-John Smith,20,24,20,1,1,0,1,...
-Jane Doe,18,22,18,0,1,1,0,...
-```
-
----
+Follow this video tutorial: https://youtu.be/1OiDEePXTrs
 
 ## Troubleshooting
 
@@ -469,7 +147,7 @@ Jane Doe,18,22,18,0,1,1,0,...
 2. **Check if Python is in PATH:**
    - Windows: Open Command Prompt, type `python`
    - If it opens Microsoft Store, Python is not in PATH
-   - Reinstall Python with "Add to PATH" checked
+   - Reinstall Python with ""Add to PATH"" checked
 
 3. **Check file location:**
    - Make sure `scheduler.py` is in the correct folder
@@ -498,13 +176,13 @@ pip install pillow
 
 ### Schedule Generation Fails
 
-**Problem:** Clicking "Generate Schedule" shows an error
+**Problem:** Clicking ""Generate Schedule"" shows an error
 
 **Solutions:**
 1. **Check CSV file format**
    - Ensure all required columns exist
    - Check column names match exactly
-   - Verify shift codes (0930, 1030, 1300, 1300F)
+   - Verify shift codes (0930, 1030, 1300, 1530)
    - Ensure day codes (M1, TU1, W1, TH1, M2, TU2, W2, TH2)
 
 2. **Check CSV values**
@@ -569,7 +247,8 @@ pip install pillow
 **Hard Constraints:**
 - Never exceed desk capacity per shift
 - Never exceed maximum hours per person
-- Prevent conflicting overlapping shifts
+- Never violate 2-hour minimum shift length
+- Respect mandatory break (12:30-13:00)
 - Enforce weekly variance limits
 
 **Soft Preferences:**
@@ -581,26 +260,21 @@ pip install pillow
 ### Shift Structure
 
 **Fixed Shifts:**
-- **9:30-12:30** (3 hours) - Full morning shift
-- **10:30-12:30** (2 hours) - Late morning shift
-- **13:00-15:30** (2.5 hours) - Regular afternoon shift
-- **13:00-17:00** (4 hours) - Extended afternoon shift
+- **9:30-10:30** (1 hour) - Early morning
+- **10:30-12:30** (2 hours) - Mid-morning
+- **13:00-15:30** (2.5 hours) - Mid-afternoon
+- **15:30-17:00** (1.5 hours) - Late afternoon
 
 **Mandatory Break:**
 - **12:30-13:00** (30 minutes)
-- No shifts cover this time period
-- Automatic break for anyone working morning + afternoon shifts
-
-**Shift Overlap Notes:**
-- Morning shifts overlap: 9:30-12:30 contains 10:30-12:30
-- Afternoon shifts overlap: 13:00-17:00 contains 13:00-15:30
-- A person cannot be assigned both overlapping shifts on the same day
+- No one can work through this period
+- If working morning + afternoon, shown as 2 separate blocks
 
 **Common Combinations:**
-- Full day (long): 9:30-12:30 + 13:00-17:00 (7 hours with 30-min break)
-- Full day (regular): 9:30-12:30 + 13:00-15:30 (5.5 hours with 30-min break)
-- Late start (long): 10:30-12:30 + 13:00-17:00 (6 hours with 30-min break)
-- Late start (regular): 10:30-12:30 + 13:00-15:30 (4.5 hours with 30-min break)
+- Full morning: 9:30-12:30 (3 hours)
+- Full afternoon: 13:00-17:00 (4 hours)
+- Full day: 9:30-12:30 + 13:00-17:00 (7 hours with break)
+- Cross-break: 10:30-12:30 + 13:00-15:30 (4.5 hours with break)
 
 ### Color Scheme
 
@@ -681,9 +355,9 @@ This creates 3 new sample CSV files with different distributions.
 ### CSV Preparation:
 
 1. **Use provided samples as templates**
-2. **Keep hours divisible by shift lengths** (0.5, 1, 1.5, 2, 2.5, 3, etc.)
+2. **Keep hours divisible by shift lengths** (0.25, 0.5, 0.75, 1, etc.)
 3. **Ensure preferred ≤ agreed ≤ max** for each person
-4. **Double-check shift codes** (0930, 1030, 1300, 1300F)
+4. **Double-check shift codes** (0930, 1030, 1315, 1530)
 5. **Verify day codes** (M1, TU1, W1, TH1, M2, TU2, W2, TH2)
 
 ---
@@ -714,4 +388,5 @@ This creates 3 new sample CSV files with different distributions.
 
 ---
 
-**Enjoy scheduling with B2.0!** 📅
+**Enjoy scheduling with B2.0!** 📅"
+<img width="81" height="684" alt="image" src="https://github.com/user-attachments/assets/de03a1f1-7416-4088-b5cd-e2950dd2f8f2" />
